@@ -93,6 +93,10 @@ describe("NPC 출력", () => {
     expect(p.user).toContain("점심 때 연락하는 게 어려워?");
     expect(p.user).toContain("안식처야");
     expect(p.system).toContain("단호하다");
+    // B 형식: 2인칭, 말/행동 구분
+    expect(p.user).toContain("- 너 (말): 팀장님 얘기는");
+    expect(p.user).toContain("- 플레이어 (말): 안식처야");
+    expect(p.system).toContain("하지 말 것");
   });
   it("대본 모드도 형식을 지킨다", () => {
     const r = scriptedReply(newGame("t", Date.now(), false), "미안해 내가 서운해서 그랬어");

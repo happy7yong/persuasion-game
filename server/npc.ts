@@ -63,29 +63,36 @@ export function buildNpcPrompt(state: GameState, playerText: string, move: NpcMo
     ENGINE_RULES,
     COMMON_PRINCIPLES,
     NPC_CORE,
-    `# 장면\n${SCENARIO.place}\n## 네가 아는 사실\n${SCENE_FACTS.map((f) => `- ${f}`).join("\n")}`,
+    `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${SCENE_FACTS.map((f) => `- ${f}`).join("\n")}`,
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
     SCORING_RUBRIC,
     OUTPUT_FORMAT,
     `# 이번 차례를 끝내는 방식\n${MOVE_GUIDE[move]}`,
   ].join("\n\n");
 
-  const lines: string[] = [];
-  lines.push("[윤재] " + SCENARIO.opening.map(fmtBeat).join(" "));
+  // B(relationship-engine)의 대화 기록 형식: 너/플레이어, 말/행동을 나눠 2인칭으로 준다.
+  const lines: string[] = SCENARIO.opening.map(beatLine);
   for (const t of state.turns) {
-    lines.push(`[플레이어] ${t.player}`);
-    lines.push("[윤재] " + t.npc.map(fmtBeat).join(" "));
+    lines.push(`- 플레이어 (말): ${t.player}`);
+    lines.push(...t.npc.map(beatLine));
   }
-  const user = `# 지금까지의 대화\n${lines.join("\n")}\n\n# 플레이어의 이번 말\n${playerText}`;
+  const user = `# 지금까지 네가 보고 들은 대화
+${lines.join("\n")}
+
+# 방금 플레이어가 한 것
+- 플레이어 (말): ${playerText}
+
+# 이번 차례
+위 규칙에 따라 JSON으로 답한다.`;
   return { system, user };
 }
 
-function fmtBeat(b: { type: string; content: string }) {
-  return b.type === "narration" ? `(${b.content})` : `"${b.content}"`;
+function beatLine(b: { type: string; content: string }) {
+  return b.type === "narration" ? `- 너 (행동): ${b.content}` : `- 너 (말): ${b.content}`;
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "yunjae@2";
+export const NPC_PROMPT_VERSION = "yunjae@3";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
