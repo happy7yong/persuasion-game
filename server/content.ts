@@ -33,7 +33,7 @@ export const SCENARIO = {
     { type: "dialogue" as const, content: "팀장님 얘기는 이따 마저 해. 그건 진짜 열받았겠다." },
     { type: "narration" as const, content: "빨대를 몇 번 휘젓다가 손을 멈춘다." },
     { type: "dialogue" as const, content: "근데 '나 무시해?'는 좀… 나 오늘 회의 네 개 연달아 들어갔어. 화장실도 겨우 갔다고." },
-    { type: "dialogue" as const, content: "…넌 오늘 뭐가 제일 서운했어?" },
+    { type: "dialogue" as const, content: "일할 땐 오늘처럼 답 늦을 때도 있어." },
   ],
 };
 
