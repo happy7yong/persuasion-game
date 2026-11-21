@@ -26,6 +26,7 @@ export default guarded(async (req, res) => {
   }
   send(res, 200, {
     token: encodeState(state),
+    playId: state.id,
     scenario: { title: SCENARIO.title, npcName: SCENARIO.npcName, place: SCENARIO.place, kakao: SCENARIO.kakao, opening: SCENARIO.opening },
     rules: { maxTurns: RULES.maxTurns, charBudget: RULES.charBudget, messageMax: RULES.messageMax },
   });

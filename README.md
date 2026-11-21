@@ -18,7 +18,7 @@ NPC 프롬프트 구조(엔진 규칙 / 공통 원칙 / 인물 Core)와 "LLM은 
 | `server/llm.ts`, `server/model-config.ts` | OpenRouter 호출, 호출별 설정, 하드 타임아웃, 재시도 1회, 시도별 기록 |
 | `server/store.ts`, `server/sync.ts` | Supabase 저장(필수 기록·부가 trace), 멱등 처리, 저장된 기록으로 상태 따라잡기 |
 
-점수(마음 지수)는 플레이 중에 화면에 보내지 않는다. 엔딩에서만 공개된다. 모든 판은 다섯 마디를 끝까지 하고(조기 종료 없음), 끝난 뒤 흔든 정도가 60% 이상이면 설득 성공이다. 최대 100%. 참가자가 5명 이상이면 결과에 참가자 대비 순위(상위 n%)를 보여 준다.
+점수(마음 지수)는 플레이 중에 화면에 보내지 않는다. 엔딩에서만 공개된다. 모든 판은 다섯 마디를 끝까지 하고(조기 종료 없음), 끝난 뒤 흔든 정도가 60% 이상이면 설득 성공이다. 최대 100%.
 
 ## 실패와 중복 요청 처리
 
@@ -48,6 +48,7 @@ npm test
 2. Environment Variables에 `SESSION_SECRET`(16자 이상 랜덤), `OPENROUTER_API_KEY`를 넣는다. 모델을 바꾸려면 `NPC_MODEL`, `ENDING_MODEL`.
 3. 로그를 모으려면 Supabase SQL Editor에서 `supabase/schema.sql`을 실행하고 (테이블 `plays`, `turns`, `llm_calls`) `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MAX_TOTAL_PLAYS`를 넣는다. 이걸 연결해야 시작 화면의 "몇 명 중 몇 명이 설득했어요"가 보이고, 같은 토큰으로 마디를 다시 보내거나 엔딩을 반복 생성하는 것도 막힌다.
 4. OpenRouter 콘솔에서 크레딧 한도를 걸어 두면 비용 사고를 막을 수 있다.
+5. 선택: [Microsoft Clarity](https://clarity.microsoft.com)에서 프로젝트를 만들고 ID를 `VITE_CLARITY_ID`에 넣은 뒤 다시 배포한다. 대시보드의 Live users에서 접속 중인 참가자를 실시간으로 보고, 녹화를 볼 수 있다. 녹화는 `play_id` 태그로 Supabase `plays.id`와 맞춰 볼 수 있고, 결과(`outcome`, `shake`)와 이벤트(`turn_sent`, `ending_shown`, `error_*` 등)로 거를 수 있다. 채팅 말풍선은 녹화에 보이게 해 두었고(`data-clarity-unmask`), 입력창에 치는 중인 글자는 Clarity가 항상 가린다.
 
 ## 수집하는 데이터
 

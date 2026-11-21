@@ -4,6 +4,8 @@ export type Exchange = { player: string; beats: Beat[] };
 
 export interface StartResponse {
   token: string;
+  /** Clarity 녹화와 Supabase 기록을 맞춰 보는 판 ID */
+  playId: string;
   scenario: { title: string; npcName: string; place: string; kakao: Kakao[]; opening: Beat[] };
   rules: { maxTurns: number; charBudget: number; messageMax: number };
 }
@@ -36,12 +38,6 @@ export interface Ending {
   textbook: string;
   sideArticles: string[];
   untaken: { instead: string; events: string[] };
-}
-
-/** 참가자 대비 순위. 참가자가 적으면 null */
-export interface Rank {
-  top: number;
-  total: number;
 }
 
 export interface Stats {
@@ -87,7 +83,7 @@ export const newKey = (): string =>
 export const api = {
   start: (heardBefore: boolean) => post<StartResponse>("/api/start", { consent: true, heardBefore }),
   turn: (token: string, message: string, key: string) => post<TurnResponse>("/api/turn", { token, message, idempotency_key: key }),
-  finish: (token: string, giveup: boolean) => post<{ token: string; ending: Ending; stats: Stats | null; rank: Rank | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
+  finish: (token: string, giveup: boolean) => post<{ token: string; ending: Ending; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
   stats: async (): Promise<Stats | null> => {
     try {
       const res = await fetch("/api/stats");

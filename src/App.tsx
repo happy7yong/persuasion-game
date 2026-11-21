@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, newKey, type Beat, type Exchange, type StartResponse, type Stats } from "./api";
 import { Ending } from "./Ending";
+import { tag, tagPlay, track } from "./clarity";
 import { clearGame, loadGame, saveGame, type Msg, type SavedGame } from "./storage";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -19,6 +20,10 @@ export function App() {
     if (session) saveGame(session);
   }, [session]);
 
+  useEffect(() => {
+    if (session?.game.playId) tagPlay(session.game.playId);
+  }, [session?.game.playId]);
+
   const restart = () => {
     clearGame();
     setSession(null);
@@ -36,7 +41,7 @@ export function App() {
     );
   }
   if (session.ending) {
-    return <Ending data={session.ending.data} stats={session.ending.stats} rank={session.ending.rank ?? null} npcName={session.game.scenario.npcName} onRetry={restart} />;
+    return <Ending data={session.ending.data} stats={session.ending.stats} npcName={session.game.scenario.npcName} onRetry={restart} />;
   }
   return <Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} />;
 }
@@ -53,6 +58,7 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
     setError("");
     try {
       onStart(await api.start(heard));
+      track("game_started");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "문제가 생겼어요. 다시 시도해 주세요.");
       setBusy(false);
@@ -88,7 +94,7 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
         </ul>
         <label className="check">
           <input type="checkbox" checked={consent} onChange={(e) => (setConsent(e.target.checked), setError(""))} />
-          <span>대화 내용이 이름 없이 연구용으로 저장되는 것에 동의해요. 상대는 AI이고, 개인정보는 쓰지 말아 주세요.</span>
+          <span>대화 내용이 이름 없이 연구용으로 저장되고, 화면 이용 과정(대화 포함)이 Microsoft Clarity로 기록되는 것에 동의해요. 상대는 AI이고, 개인정보는 쓰지 말아 주세요.</span>
         </label>
         <label className="check">
           <input type="checkbox" checked={heard} onChange={(e) => setHeard(e.target.checked)} />
@@ -197,7 +203,10 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
     try {
       const res = await api.finish(tokenRef.current, giveup);
       tokenRef.current = res.token;
-      update({ token: res.token, finished: true, ending: { data: res.ending, stats: res.stats, rank: res.rank } });
+      update({ token: res.token, finished: true, ending: { data: res.ending, stats: res.stats } });
+      tag("outcome", res.ending.plan.outcome);
+      tag("shake", String(res.ending.plan.shake));
+      track(giveup ? "game_given_up" : "ending_shown");
       window.scrollTo({ top: 0 });
     } catch (e) {
       const err = e instanceof ApiError ? e : null;
@@ -237,6 +246,7 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
       setTyping(false);
       setMsgs((m) => m.filter((x) => x.id !== optimisticId));
       applyProgress(res);
+      track("turn_sent");
       await appendExchanges(res.exchanges, true);
       finished = res.finished;
     } catch (e) {
@@ -253,6 +263,7 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
         if (err.resync.exchanges.length > 0) setNotice({ kind: "info", text: err.message });
       } else {
         setText(msg);
+        track(`error_${err.code}`);
         setNotice({ kind: "error", text: err.message, ...(err.code === "session_expired" ? { action: "restart" as const } : {}) });
       }
     }
@@ -302,7 +313,7 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
 
       <KakaoCard game={game} />
 
-      <ol className="thread" aria-live="polite">
+      <ol className="thread" aria-live="polite" data-clarity-unmask="true">
         {msgs.map((m) =>
           m.beat.type === "narration" ? (
             <li key={m.id} className="beat-narr">

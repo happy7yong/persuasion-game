@@ -145,8 +145,6 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .result-outcome { display: inline-block; background: var(--pink); color: var(--indigo); font-weight: 800; border-radius: 999px; padding: 4px 14px; margin: 0 0 10px; }
 .result-shake { font-size: 22px; margin: 0 0 6px; font-weight: 700; }
 .result-shake strong { font-family: var(--display); font-weight: 400; font-size: 64px; color: var(--yellow); display: block; line-height: 1.1; }
-.result-rank { margin: 0 0 10px; font-size: 17px; }
-.result-rank strong { color: var(--yellow); }
 .result-note, .result-stats { color: var(--star-dim); margin: 0 0 12px; }
 .result-line { background: var(--indigo-2); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; font-size: 16px; }
 .result-line span, .result-untaken span { display: block; font-size: 13px; color: var(--yellow); margin-bottom: 2px; }
