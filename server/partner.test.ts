@@ -1,4 +1,4 @@
-// 연인 선택: 이름과 성별만 바뀌고 나머지(Core, 장면, 첫 대사)는 같아야 한다.
+// 연인별 Core와 공통 장면을 검증한다.
 import { describe, expect, it } from "vitest";
 import { coreFor, PARTNERS, rubricFor, scenarioFor, sceneFactsFor } from "./content.js";
 import { buildReport } from "./report.js";
@@ -20,9 +20,9 @@ describe("연인 선택", () => {
     expect(coreFor("m")).toContain("# 인물 Core: 윤재");
   });
 
-  it("이름과 성별 말고는 Core가 같다", () => {
-    const strip = (t: string, name: string, g: string) => t.replaceAll(name, "X").replace(`${g} 회사원`, "Y 회사원");
-    expect(strip(coreFor("m"), "윤재", "남자")).toBe(strip(coreFor("f"), "서아", "여자"));
+  it("윤재 전용 서술은 서아에게 전달되지 않고 장면은 공유한다", () => {
+    expect(coreFor("m")).toContain("밀린 이야기를 천천히");
+    expect(coreFor("f")).not.toContain("밀린 이야기를 천천히");
     expect(sceneFactsFor("f").join()).toBe(sceneFactsFor("m").join().replaceAll("윤재", "서아"));
     expect(rubricFor("f")).not.toContain("윤재");
   });
