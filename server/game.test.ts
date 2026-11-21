@@ -32,14 +32,23 @@ describe("점수 규칙", () => {
     expect(s.score).toBe(100 - 3 - 15 - 14 - 12 - 10);
     expect(s.outcome).toBe("compromise");
   });
-  it("세 마디 이후 충분히 흔들리면 일찍 성공한다", () => {
-    const s = play([
+  it("충분히 흔들어도 다섯 마디를 끝까지 하고, 끝난 뒤에 성공을 판정한다", () => {
+    const three = play([
       ["a", 20, ["emotion"]],
       ["b", 20, ["compromise"]],
       ["c", 20, ["empathy"]],
     ]);
-    expect(s.finished).toBe(true);
-    expect(s.outcome).toBe("success");
+    expect(three.finished).toBe(false);
+    const five = play([
+      ["a", 20, ["emotion"]],
+      ["b", 20, ["compromise"]],
+      ["c", 20, ["empathy"]],
+      ["d", 20, ["apology"]],
+      ["e", 20, ["humor"]],
+    ]);
+    expect(five.finished).toBe(true);
+    expect(five.outcome).toBe("success");
+    expect(five.score).toBe(0); // 100% 흔들기가 가능하다
   });
   it("발언권과 한 번에 쓸 수 있는 글자 수를 지킨다", () => {
     const s = newGame("t", Date.now(), false);

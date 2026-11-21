@@ -10,12 +10,10 @@ export const RULES = {
   maxDropPerTurn: 20,
   /** 압박·반복으로만 이뤄진 말의 최대치 */
   maxDropForPressure: 3,
-  /** 이 값 이하가 되면 설득 성공 (흔들림 60% 이상) */
+  /** 다섯 마디가 끝났을 때 이 값 이하면 설득 성공 (흔들림 60% 이상). 일찍 끝나지 않는다: 모두 같은 조건에서 비교 */
   successScore: 40,
   /** 이 값 이하로 끝나면 타협 (흔들림 30% 이상) */
   compromiseScore: 70,
-  /** 설득 성공으로 일찍 끝날 수 있는 최소 마디 */
-  minTurnsForEarlySuccess: 3,
 } as const;
 
 export const STRATEGY_LABELS = [
@@ -107,10 +105,9 @@ export function recordTurn(state: GameState, turn: Omit<TurnRecord, "scoreAfter"
   const turns = [...state.turns, { ...turn, applied, scoreAfter: score }];
   const charsUsed = state.charsUsed + countChars(turn.player);
   const next: GameState = { ...state, score, turns, charsUsed };
-  const earlySuccess = score <= RULES.successScore && turns.length >= RULES.minTurnsForEarlySuccess;
   const outOfTurns = turns.length >= RULES.maxTurns;
   const outOfChars = charsUsed >= RULES.charBudget;
-  if (earlySuccess || outOfTurns || outOfChars) return finish(next, null);
+  if (outOfTurns || outOfChars) return finish(next, null);
   return next;
 }
 

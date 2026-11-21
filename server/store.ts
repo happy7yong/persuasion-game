@@ -161,6 +161,20 @@ async function count(filter: string): Promise<number | null> {
   }
 }
 
+/** 순위를 보여 줄 최소 참가자 수. 몇 명 안 될 때 "상위 100%" 같은 숫자가 나오지 않게. */
+export const RANK_MIN_PLAYERS = 5;
+
+/**
+ * 끝난 판들 가운데 이 점수의 위치. 마음 지수가 낮을수록(더 흔들었을수록) 위다.
+ * top = 나보다 더 흔든 사람 수 + 1을 전체로 나눈 백분율 (같은 점수는 같은 순위).
+ */
+export async function rankOf(finalScore: number): Promise<{ top: number; total: number } | null> {
+  if (!storeEnabled()) return null;
+  const [total, better] = await Promise.all([count("finished_at=not.is.null"), count(`finished_at=not.is.null&final_score=lt.${Math.round(finalScore)}`)]);
+  if (total === null || better === null || total < RANK_MIN_PLAYERS) return null;
+  return { top: Math.min(100, Math.max(1, Math.ceil(((better + 1) / total) * 100))), total };
+}
+
 export async function stats(): Promise<{ finished: number; persuaded: number; total: number } | null> {
   if (!storeEnabled()) return null;
   const [total, finished, persuaded] = await Promise.all([count("id=not.is.null"), count("finished_at=not.is.null"), count("outcome=eq.success")]);

@@ -36,7 +36,7 @@ export function App() {
     );
   }
   if (session.ending) {
-    return <Ending data={session.ending.data} stats={session.ending.stats} npcName={session.game.scenario.npcName} onRetry={restart} />;
+    return <Ending data={session.ending.data} stats={session.ending.stats} rank={session.ending.rank ?? null} npcName={session.game.scenario.npcName} onRetry={restart} />;
   }
   return <Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} />;
 }
@@ -197,7 +197,7 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
     try {
       const res = await api.finish(tokenRef.current, giveup);
       tokenRef.current = res.token;
-      update({ token: res.token, finished: true, ending: { data: res.ending, stats: res.stats } });
+      update({ token: res.token, finished: true, ending: { data: res.ending, stats: res.stats, rank: res.rank } });
       window.scrollTo({ top: 0 });
     } catch (e) {
       const err = e instanceof ApiError ? e : null;

@@ -38,6 +38,12 @@ export interface Ending {
   untaken: { instead: string; events: string[] };
 }
 
+/** 참가자 대비 순위. 참가자가 적으면 null */
+export interface Rank {
+  top: number;
+  total: number;
+}
+
 export interface Stats {
   total: number;
   finished: number;
@@ -81,7 +87,7 @@ export const newKey = (): string =>
 export const api = {
   start: (heardBefore: boolean) => post<StartResponse>("/api/start", { consent: true, heardBefore }),
   turn: (token: string, message: string, key: string) => post<TurnResponse>("/api/turn", { token, message, idempotency_key: key }),
-  finish: (token: string, giveup: boolean) => post<{ token: string; ending: Ending; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
+  finish: (token: string, giveup: boolean) => post<{ token: string; ending: Ending; stats: Stats | null; rank: Rank | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
   stats: async (): Promise<Stats | null> => {
     try {
       const res = await fetch("/api/stats");

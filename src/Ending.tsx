@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Ending as EndingData, Outcome, Stats } from "./api";
+import type { Ending as EndingData, Outcome, Rank, Stats } from "./api";
 
 const OUTCOME: Record<Outcome, { name: string; note: string }> = {
   success: { name: "설득 성공", note: "윤재의 마음을 돌렸어요." },
@@ -27,7 +27,7 @@ function CountUp({ to }: { to: number }) {
   return <>{n}</>;
 }
 
-export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; stats: Stats | null; npcName: string; onRetry: () => void }) {
+export function Ending({ data, stats, rank, npcName, onRetry }: { data: EndingData; stats: Stats | null; rank: Rank | null; npcName: string; onRetry: () => void }) {
   const { plan, chains } = data;
   const steps = 1 + chains.length + 4; // 방송 시작, 마디별 폭발, 갈림길, 신문, 결과, 마지막
   const [step, setStep] = useState(reduceMotion() ? steps : 0);
@@ -43,7 +43,7 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
   }, [step, steps]);
 
   const share = async () => {
-    const text = `나는 ${npcName}의 마음을 ${plan.shake}% 흔들었다. 너는?\n${location.origin}`;
+    const text = `나는 ${npcName}의 마음을 ${plan.shake}% 흔들었다${rank ? ` (상위 ${rank.top}%)` : ""}. 너는?\n${location.origin}`;
     try {
       if (navigator.share) await navigator.share({ text });
       else {
@@ -139,6 +139,11 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
           <p className="result-shake">
             {npcName}의 마음을 <strong><CountUp to={plan.shake} />%</strong> 흔들었어요
           </p>
+          {rank && (
+            <p className="result-rank">
+              참가자 {rank.total}명 중 <strong>상위 {rank.top}%</strong>
+            </p>
+          )}
           <p className="result-note">
             {OUTCOME[plan.outcome].note}
             {plan.outcome !== "success" && plan.shake < SUCCESS_SHAKE && ` 설득까지 ${SUCCESS_SHAKE - plan.shake}% 남았어요.`}
