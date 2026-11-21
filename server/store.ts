@@ -43,7 +43,19 @@ async function rest(path: string, init: { method: string; body?: unknown; prefer
 }
 
 async function ok(res: Response): Promise<Response> {
-  if (!res.ok) throw new StoreError(`http_${res.status}`);
+  if (!res.ok) {
+    // Supabase가 알려준 원인(예: 없는 컬럼)을 Vercel 함수 로그에 남긴다. 키나 대화 내용은 담기지 않는다.
+    const body = await res.text().catch(() => "");
+    let detail = body.slice(0, 300);
+    try {
+      const j = JSON.parse(body) as { code?: string; message?: string; hint?: string };
+      detail = [j.code, j.message, j.hint].filter(Boolean).join(" | ");
+    } catch {
+      /* JSON이 아니면 앞부분만 */
+    }
+    console.warn(`[store] ${res.status} ${detail}`);
+    throw new StoreError(`http_${res.status}`);
+  }
   return res;
 }
 

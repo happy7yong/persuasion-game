@@ -65,3 +65,32 @@ create index if not exists llm_calls_play_idx on llm_calls(play_id, call_type, t
 alter table plays enable row level security;
 alter table turns enable row level security;
 alter table llm_calls enable row level security;
+
+-- ------------------------------------------------------------------
+-- 이미 테이블이 있는 경우: create table if not exists는 건너뛰므로,
+-- 나중에 추가된 컬럼과 제약을 아래에서 채운다. 몇 번을 실행해도 안전하다.
+alter table plays add column if not exists heard_before boolean;
+alter table plays add column if not exists partner text;
+alter table plays add column if not exists finished_at timestamptz;
+alter table plays add column if not exists outcome text;
+alter table plays add column if not exists final_score int;
+alter table plays add column if not exists turns_count int;
+alter table plays add column if not exists chars_used int;
+alter table plays add column if not exists ending_model text;
+alter table plays add column if not exists ending_usage jsonb;
+alter table plays add column if not exists ending jsonb;
+
+alter table turns add column if not exists idempotency_key text;
+alter table turns add column if not exists npc_move text;
+alter table turns add column if not exists applied_drop int;
+alter table turns add column if not exists score_after int;
+alter table turns add column if not exists reason text;
+alter table turns add column if not exists model text;
+alter table turns add column if not exists usage jsonb;
+alter table turns add column if not exists elapsed_ms int;
+alter table turns add column if not exists prompt_version text;
+
+create unique index if not exists turns_play_idx_unique on turns(play_id, idx);
+
+-- PostgREST가 새 컬럼을 바로 알도록 스키마 캐시를 다시 읽게 한다
+notify pgrst, 'reload schema';
