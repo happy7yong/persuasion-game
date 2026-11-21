@@ -2,7 +2,7 @@ import { z } from "zod";
 import { BAND_GUIDE, COMMON_PRINCIPLES, coreFor, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, rubricFor, SCENARIO, sceneFactsFor, scenarioFor } from "./content.js";
 import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
 import { modelConfig } from "./model-config.js";
-import { band, chooseMove, STRATEGY_LABELS, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
+import { band, chooseMove, NPC_MOVES, STRATEGY_LABELS, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
 
 const BeatSchema = z.object({
   type: z.enum(["narration", "dialogue"]),
@@ -62,7 +62,7 @@ export function parseNpcOutput(raw: unknown, move: NpcMove = "counter", strict =
   };
 }
 
-export function buildNpcPrompt(state: GameState, playerText: string, move: NpcMove = chooseMove(state)): { system: string; user: string } {
+export function buildNpcPrompt(state: GameState, playerText: string, move: NpcMove | null = state.turns.length ? chooseMove(state) : null): { system: string; user: string } {
   const partner = state.partner ?? "m";
   const system = [
     ENGINE_RULES,
@@ -72,7 +72,9 @@ export function buildNpcPrompt(state: GameState, playerText: string, move: NpcMo
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
     rubricFor(partner),
     OUTPUT_FORMAT,
-    `# 이번 차례를 끝내는 방식\n${MOVE_GUIDE[move]}`,
+    move === null
+      ? "# 첫 응답의 끝맺음\n방금 들은 말에서 네 마음에 걸린 부분에 반응한다. 억울하면 받아치고(counter), 더 듣고 싶은 게 생기면 그 일에 관해 한 가지만 묻고(ask), 납득한 점은 짧게 인정하고(concede), 말이 안 나오면 행동으로 끝낸다(linger). 정해진 순서는 없다. 해결책은 플레이어가 꺼내게 둔다. 실제로 고른 방식을 move에 기록한다."
+      : `# 이번 차례를 끝내는 방식\n${MOVE_GUIDE[move]}`,
   ].join("\n\n");
 
   // B(relationship-engine)의 대화 기록 형식: 너/플레이어, 말/행동을 나눠 2인칭으로 준다.
@@ -97,7 +99,7 @@ function beatLine(b: { type: string; content: string }) {
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "yunjae@5";
+export const NPC_PROMPT_VERSION = "yunjae@6";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
@@ -128,6 +130,13 @@ export const NPC_JSON_SCHEMA = {
   },
 } as const;
 
+const firstReplyMove = z.object({ move: z.enum(NPC_MOVES) });
+const firstReplySchema = {
+  ...NPC_JSON_SCHEMA,
+  required: [...NPC_JSON_SCHEMA.required, "move"],
+  properties: { ...NPC_JSON_SCHEMA.properties, move: { type: "string", enum: NPC_MOVES } },
+};
+
 export type NpcResult =
   | { ok: true; reply: NpcReply; attempts: AttemptRecord[] }
   | { ok: false; failure: LlmFailure; attempts: AttemptRecord[] };
@@ -135,11 +144,11 @@ export type NpcResult =
 export async function npcReply(state: GameState, playerText: string): Promise<NpcResult> {
   if (isScripted()) return { ok: true, reply: scriptedReply(state, playerText), attempts: [] };
   const cfg = modelConfig("npc_turn");
-  const move = chooseMove(state);
+  const move = state.turns.length ? chooseMove(state) : null;
   const prompt = buildNpcPrompt(state, playerText, move);
   // 첫 시도는 끝맺음 방식까지 엄격하게, 마지막 시도는 형식만 본다 (질문 하나 때문에 마디를 잃지 않게).
-  const parse = (json: unknown, a: { last: boolean }) => parseNpcOutput(json, move, !a.last);
-  const res = await callWithRetry(cfg, { ...prompt, schemaName: "npc_turn", schema: NPC_JSON_SCHEMA }, parse);
+  const parse = (json: unknown, a: { last: boolean }) => parseNpcOutput(json, move ?? firstReplyMove.parse(json).move, !a.last);
+  const res = await callWithRetry(cfg, { ...prompt, schemaName: "npc_turn", schema: move === null ? firstReplySchema : NPC_JSON_SCHEMA }, parse);
   if (!res.ok) return res;
   const last = res.attempts.at(-1);
   return {
@@ -159,10 +168,15 @@ export function scriptedReply(state: GameState, text: string): NpcReply {
   if (/ㅋ/.test(text)) labels.push("humor");
   if (/당연|무시|애인 맞|왜 안/.test(text) && labels.length === 0) labels.push("pressure");
   const suggested = labels.includes("pressure") ? 2 : Math.min(20, 4 + labels.length * 5 + Math.floor(text.length / 40));
-  const move = chooseMove(state);
+  let move = chooseMove(state);
+  if (state.turns.length === 0) {
+    if (labels.includes("pressure")) move = "counter";
+    else if (/팀장|목소리|힘들|속상/.test(text)) move = "ask";
+    else move = labels.includes("apology") ? "concede" : "linger";
+  }
   const said: Record<NpcMove, string> = {
     counter: "음, 그 말은 마음에 남는다. 근데 나 화요일은 회의만 다섯 개라 진짜 폰을 못 보거든.",
-    ask: "그날 제일 서운했던 게 뭐였어?",
+    ask: text.includes("팀장") ? "아까 팀장님이 뭐라고 했는데?" : "그때 무슨 일이 있었어?",
     concede: "알았어, 그건 네 말이 맞아. 대신 회의 몰린 날은 조금만 봐줘.",
     linger: "…그렇구나.",
   };
