@@ -30,7 +30,7 @@ export const SCENARIO = {
   ],
   opening: [
     { type: "narration" as const, content: "윤재가 라떼 두 잔을 내려놓고 맞은편 의자에 털썩 앉는다. 네 잔에는 이미 빨대가 꽂혀 있다." },
-    { type: "dialogue" as const, content: "팀장님 얘기는 이따 마저 해. 그건 진짜 열받았겠다." },
+    { type: "dialogue" as const, content: "팀장님 얘기는 이따 마저 하자. 그건 진짜 열받았겠다." },
     { type: "narration" as const, content: "빨대를 몇 번 휘젓다가 손을 멈춘다." },
     { type: "dialogue" as const, content: "근데 '나 무시해?'는 좀… 나 오늘 회의 네 개 연달아 들어갔어. 화장실도 겨우 갔다고." },
     { type: "dialogue" as const, content: "일할 땐 오늘처럼 답 늦을 때도 있어." },
