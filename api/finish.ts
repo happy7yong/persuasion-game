@@ -1,9 +1,9 @@
-import { waitUntil } from "@vercel/functions";
+// 판을 끝내고 대화 리포트를 돌려준다. LLM을 부르지 않으므로 바로 끝난다.
 import { z } from "zod";
-import { ENDING_PROMPT_VERSION, writeEnding } from "../server/ending.js";
 import { fail, guarded, parseRequest, send } from "../server/http.js";
+import { buildReport } from "../server/report.js";
 import { finish } from "../server/rules.js";
-import { finishPlay, listTurns, saveAttempts, stats, storedEnding } from "../server/store.js";
+import { finishPlay, listTurns, playFinished, stats } from "../server/store.js";
 import { catchUp } from "../server/sync.js";
 import { decodeState, encodeState } from "../server/token.js";
 
@@ -15,11 +15,11 @@ export default guarded(async (req, res) => {
   let state = decodeState(b.token);
   if (!state) return fail(res, "session_expired", "판 정보가 만료됐어요. 처음부터 다시 시작해 주세요.");
 
+  let alreadySaved = false;
   try {
     const rows = await listTurns(state.id);
     if (rows) state = catchUp(state, rows).latest; // 저장된 기록이 기준
-    const cached = await storedEnding(state.id);
-    if (cached) return send(res, 200, { token: encodeState(state), ending: cached, stats: await stats() });
+    alreadySaved = await playFinished(state.id);
   } catch {
     return fail(res, "service_unavailable", "기록 저장소에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   }
@@ -29,18 +29,14 @@ export default guarded(async (req, res) => {
     state = finish(state, "giveup");
   }
 
-  const result = await writeEnding(state);
-  waitUntil(saveAttempts(state.id, "ending", null, ENDING_PROMPT_VERSION, result.attempts));
-  if (!result.ok) {
-    console.warn("[finish] generation_failed", state.id, result.failure.message);
-    return fail(res, "generation_failed", "은하 신문 인쇄가 늦어지고 있어요. 다시 시도해 주세요.", { token: encodeState(state) });
+  const report = buildReport(state);
+  if (!alreadySaved) {
+    try {
+      await finishPlay(state, report);
+    } catch (e) {
+      // 리포트는 보여 준다. 다음 요청에서 다시 저장을 시도한다.
+      console.warn("[finish] store failed", state.id, e instanceof Error ? e.message : "");
+    }
   }
-
-  try {
-    await finishPlay(state, result.ending, result.ending.model, result.ending.usage);
-  } catch (e) {
-    // 결과는 보여 준다. 다음 요청에서 다시 생성될 수 있을 뿐이다.
-    console.warn("[finish] store failed", state.id, e instanceof Error ? e.message : "");
-  }
-  send(res, 200, { token: encodeState(state), ending: result.ending, stats: await stats() });
+  send(res, 200, { token: encodeState(state), report, stats: await stats() });
 });

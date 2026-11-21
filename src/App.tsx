@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, newKey, PARTNER_OPTIONS, type Beat, type Exchange, type Partner, type StartResponse, type Stats } from "./api";
-import { Ending } from "./Ending";
+import { ReportView } from "./Report";
 import { tag, tagPlay, track } from "./clarity";
 import { clearGame, loadGame, saveGame, type Msg, type SavedGame } from "./storage";
 
@@ -41,7 +41,7 @@ export function App() {
     );
   }
   if (session.ending) {
-    return <Ending data={session.ending.data} stats={session.ending.stats} npcName={session.game.scenario.npcName} onRetry={restart} />;
+    return <ReportView report={session.ending.data} stats={session.ending.stats} onRetry={restart} />;
   }
   return <Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} />;
 }
@@ -219,13 +219,13 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
   const goEnding = async (giveup: boolean) => {
     setClosing(true);
     setNotice(null);
-    await wait(reduceMotion() ? 0 : 1600);
+    await wait(reduceMotion() ? 0 : 1200);
     try {
       const res = await api.finish(tokenRef.current, giveup);
       tokenRef.current = res.token;
-      update({ token: res.token, finished: true, ending: { data: res.ending, stats: res.stats } });
-      tag("outcome", res.ending.plan.outcome);
-      tag("shake", String(res.ending.plan.shake));
+      update({ token: res.token, finished: true, ending: { data: res.report, stats: res.stats } });
+      tag("outcome", res.report.outcome);
+      tag("shake", String(res.report.shake));
       track(giveup ? "game_given_up" : "ending_shown");
       window.scrollTo({ top: 0 });
     } catch (e) {
@@ -353,11 +353,11 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
             <span />
           </li>
         )}
-        {closing && <li className="closing">위원회 발언 시간이 종료되었습니다</li>}
+        {closing && <li className="closing">대화가 끝났어요</li>}
         {closing && !notice && (
           <li className="loading" role="status">
             <span className="spinner" aria-hidden="true" />
-            은하 신문을 인쇄하는 중…
+            {scenario.npcName}의 속마음을 정리하는 중…
           </li>
         )}
       </ol>

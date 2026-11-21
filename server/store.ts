@@ -66,7 +66,7 @@ export async function createPlay(state: GameState): Promise<void> {
   await ok(await rest("plays", { method: "POST", prefer: "return=minimal", body: { id: state.id, heard_before: state.heardBefore, partner: state.partner ?? "m" } }));
 }
 
-export async function finishPlay(state: GameState, ending: unknown, endingModel: string, endingUsage: LlmUsage | null): Promise<void> {
+export async function finishPlay(state: GameState, report: unknown): Promise<void> {
   if (!storeEnabled()) return;
   await ok(
     await rest(`plays?id=eq.${encodeURIComponent(state.id)}`, {
@@ -78,19 +78,18 @@ export async function finishPlay(state: GameState, ending: unknown, endingModel:
         final_score: state.score,
         turns_count: state.turns.length,
         chars_used: state.charsUsed,
-        ending_model: endingModel,
-        ending_usage: endingUsage,
-        ending,
+        ending: report,
       },
     }),
   );
 }
 
-export async function storedEnding(playId: string): Promise<unknown | null> {
-  if (!storeEnabled()) return null;
-  const res = await ok(await rest(`plays?select=ending&id=eq.${encodeURIComponent(playId)}`, { method: "GET" }));
-  const rows = (await res.json()) as { ending?: unknown }[];
-  return rows[0]?.ending ?? null;
+/** 이 판의 결과를 이미 저장했는지 (다시 요청돼도 finished_at을 덮어쓰지 않게). */
+export async function playFinished(playId: string): Promise<boolean> {
+  if (!storeEnabled()) return false;
+  const res = await ok(await rest(`plays?select=finished_at&id=eq.${encodeURIComponent(playId)}`, { method: "GET" }));
+  const rows = (await res.json()) as { finished_at?: string | null }[];
+  return Boolean(rows[0]?.finished_at);
 }
 
 // ------------------------------------------------------------------ turns
@@ -101,6 +100,7 @@ export interface StoredTurn {
   player_text: string;
   npc_beats: { type: "narration" | "dialogue"; content: string }[];
   npc_move: NpcMove | null;
+  reason?: string | null;
   suggested_drop: number;
   labels: StrategyLabel[];
 }
@@ -109,7 +109,7 @@ export interface StoredTurn {
 export async function listTurns(playId: string): Promise<StoredTurn[] | null> {
   if (!storeEnabled()) return null;
   const res = await ok(
-    await rest(`turns?select=idx,idempotency_key,player_text,npc_beats,npc_move,suggested_drop,labels&play_id=eq.${encodeURIComponent(playId)}&order=idx.asc`, {
+    await rest(`turns?select=idx,idempotency_key,player_text,npc_beats,npc_move,reason,suggested_drop,labels&play_id=eq.${encodeURIComponent(playId)}&order=idx.asc`, {
       method: "GET",
     }),
   );
@@ -119,7 +119,7 @@ export async function listTurns(playId: string): Promise<StoredTurn[] | null> {
 /** 마디를 저장한다. 같은 (play_id, idx)가 이미 있으면 "conflict". 그 밖의 실패는 StoreError. */
 export async function insertTurn(
   state: GameState,
-  row: StoredTurn & { applied_drop: number; score_after: number; reason: string; model: string; usage: LlmUsage | null; elapsed_ms: number; prompt_version: string },
+  row: StoredTurn & { applied_drop: number; score_after: number; model: string; usage: LlmUsage | null; elapsed_ms: number; prompt_version: string },
 ): Promise<"ok" | "conflict" | "disabled"> {
   if (!storeEnabled()) return "disabled";
   const res = await rest("turns", { method: "POST", prefer: "return=minimal", body: { play_id: state.id, ...row } });
@@ -130,7 +130,7 @@ export async function insertTurn(
 
 // ------------------------------------------------------------------ trace (부가 기록)
 
-export async function saveAttempts(playId: string, callType: "npc_turn" | "ending", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
+export async function saveAttempts(playId: string, callType: "npc_turn", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
   if (!storeEnabled() || attempts.length === 0) return;
   try {
     const res = await rest("llm_calls", {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEndingPrompt, planEnding } from "./ending.js";
+import { buildReport } from "./report.js";
 import { buildNpcPrompt, parseNpcOutput, scriptedReply } from "./npc.js";
 import { applyDrop, checkMessage, finish, newGame, recordTurn, RULES, type GameState, type StrategyLabel } from "./rules.js";
 import { decodeState, encodeState } from "./token.js";
@@ -105,22 +105,38 @@ describe("NPC 출력", () => {
   });
 });
 
-describe("엔딩 갈림길", () => {
-  it("대화 전체로 경로를 정한다", () => {
-    const s = play([
-      ["윤재야 애인맞니?", 3, ["pressure"]],
-      ["너의 연락이 내 안식처야", 15, ["emotion"]],
-      ["4시간 넘으면 밥 사기", 14, ["compromise"]],
-      ["나 무시해는 미안", 12, ["apology"]],
-      ["그날은 너가 밥사 ㅋㅋㅋ", 10, ["humor"]],
-    ]);
-    const plan = planEnding(s);
-    expect(plan.strongestTurn).toBe(2);
-    expect(plan.weakestTurn).toBe(1);
-    expect(plan.forks[0]?.chosen).toBe("은하 연락 조약");
-    expect(plan.forks[2]?.chosen).toContain("미안해");
-    expect(plan.forks[2]?.decidingTurn).toBe(4);
-    const prompt = buildEndingPrompt(plan);
-    expect(prompt.user).toContain("너의 연락이 내 안식처야");
+describe("대화 리포트", () => {
+  it("마디마다 내 말, 연인 대답, +%, 누적 %, 속마음을 담는다", () => {
+    let st = newGame("r", Date.now(), false);
+    const rows: [string, number, string][] = [
+      ["윤재야 애인맞니?", 3, "말투부터 그러니까 좀 서운함"],
+      ["너의 연락이 내 안식처야", 15, "그렇게까지 기다린 줄은 몰랐네"],
+      ["4시간 넘으면 밥 사기", 14, "밥 내기는 좀 웃겼다"],
+      ["나 무시해는 미안", 12, "그 말 듣고 좀 풀림"],
+      ["그날은 너가 밥사 ㅋㅋㅋ", 10, "아 진짜 못 이기겠다"],
+    ];
+    for (const [player, drop, thought] of rows)
+      st = recordTurn(st, { player, npc: [{ type: "dialogue", content: "응" }], thought, suggested: drop, labels: ["emotion"] });
+    const r = buildReport(st);
+    expect(r.kind).toBe("report");
+    expect(r.turns.map((t) => t.gain)).toEqual([3, 15, 14, 12, 10]);
+    expect(r.turns.map((t) => t.total)).toEqual([3, 18, 32, 44, 54]);
+    expect(r.shake).toBe(54);
+    expect(r.successShake).toBe(60);
+    expect(r.outcome).toBe("compromise");
+    expect(r.strongestTurn).toBe(2);
+    expect(r.weakestTurn).toBe(1);
+    expect(r.turns[1]?.thought).toBe("그렇게까지 기다린 줄은 몰랐네");
+    expect(r.npcName).toBe("윤재");
+  });
+  it("모든 마디가 같으면 가장 큰·작은 말을 표시하지 않는다", () => {
+    const st = play([["a", 5, ["emotion"]], ["b", 5, ["emotion"]]]);
+    const r = buildReport(st);
+    expect(r.strongestTurn).toBeNull();
+    expect(r.weakestTurn).toBeNull();
+  });
+  it("속마음이 없던 예전 기록도 리포트를 만든다", () => {
+    const r = buildReport(play([["a", 5, ["emotion"]]]));
+    expect(r.turns[0]?.thought).toBeNull();
   });
 });

@@ -1,6 +1,5 @@
 // 윤재가 대화를 끌고 가지 않도록: 끝맺음 방식은 서버가 정하고 출력이 지켰는지 검사한다.
 import { describe, expect, it } from "vitest";
-import { buildEndingPrompt, planEnding } from "./ending.js";
 import { buildNpcPrompt, moveViolation, parseNpcOutput } from "./npc.js";
 import { chooseMove, newGame, recordTurn, RULES, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
 
@@ -62,30 +61,5 @@ describe("끝맺음 검사", () => {
     const raw = { beats: [d("넌 어떻게 생각해?")], evaluation: { suggested_drop: 5, labels: [], reason: "" } };
     expect(() => parseNpcOutput(raw, "counter", true)).toThrow(/move_violation/);
     expect(parseNpcOutput(raw, "counter", false).move).toBe("counter");
-  });
-});
-
-describe("엔딩 보정", () => {
-  const play = (rows: [string, number, StrategyLabel[]][]) => {
-    let s = newGame("e", Date.now(), false);
-    for (const [player, drop, labels] of rows) s = recordTurn(s, { player, npc: [], suggested: drop, labels });
-    return s;
-  };
-  it("말투 갈림길은 흔든 양으로 정한다 (물음표 하나가 문명을 정하지 않음)", () => {
-    const s = play([
-      ["애인맞니?", 3, ["question", "pressure"]],
-      ["네 연락이 내 안식처야", 15, ["emotion"]],
-      ["4시간 넘으면 밥 사기", 14, ["compromise"]],
-      ["회의 끝나고는?", 4, ["question"]],
-      ["나도 조심할게", 12, ["compromise", "empathy"]],
-    ]);
-    const plan = planEnding(s);
-    expect(plan.forks[1]?.chosen).toBe("조약 문명");
-    expect(plan.forks[1]?.decidingTurn).toBe(3);
-  });
-  it("엔딩 프롬프트: 한 마디 안에서 동네→은하로 커지고, 갈라지지 않은 미래는 새 문장", () => {
-    const p = buildEndingPrompt(planEnding(play([["안녕", 5, ["emotion"]]])));
-    expect(p.system).toContain("한 마디 안에서");
-    expect(p.system).toContain("새로운 한 문장");
   });
 });

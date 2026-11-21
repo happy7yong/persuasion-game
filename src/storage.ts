@@ -1,6 +1,6 @@
 // 새로고침해도 판을 이어 하도록 sessionStorage에 저장한다. 탭을 닫으면 사라진다.
 // 저장된 값은 화면 표시용 사본이다. 판의 진짜 상태는 서버가 암호화한 토큰에 있다.
-import type { Beat, Ending, StartResponse, Stats } from "./api";
+import type { Beat, Report, StartResponse, Stats } from "./api";
 
 export type Msg = { id: number; who: "npc" | "me"; beat: Beat };
 
@@ -12,10 +12,11 @@ export interface SavedGame {
   turns: number;
   left: number;
   finished: boolean;
-  ending: { data: Ending; stats: Stats | null } | null;
+  ending: { data: Report; stats: Stats | null } | null;
 }
 
-const KEY = "persuasion-game:v1";
+// v2: 결과가 은하 엔딩에서 대화 리포트로 바뀜. 예전 저장분은 읽지 않는다.
+const KEY = "persuasion-game:v2";
 
 export function loadGame(): SavedGame | null {
   try {

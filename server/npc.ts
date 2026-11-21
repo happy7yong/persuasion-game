@@ -170,7 +170,7 @@ export function scriptedReply(state: GameState, text: string): NpcReply {
     move,
     suggested,
     labels,
-    reason: "대본 모드",
+    reason: labels.includes("pressure") ? "그렇게 말하면 나도 좀 억울한데" : labels.length > 1 ? "이건 좀 마음에 남는다" : "음… 아직은 잘 모르겠음",
     model: "scripted",
     usage: null,
   };

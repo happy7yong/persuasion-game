@@ -14,7 +14,7 @@ export function catchUp(state: GameState, rows: readonly StoredTurn[]): { latest
   let latest = state;
   for (const r of extra) {
     if (latest.finished) break;
-    latest = recordTurn(latest, { player: r.player_text, npc: r.npc_beats, ...(r.npc_move ? { move: r.npc_move } : {}), suggested: Number(r.suggested_drop), labels: r.labels });
+    latest = recordTurn(latest, { player: r.player_text, npc: r.npc_beats, ...(r.npc_move ? { move: r.npc_move } : {}), ...(r.reason ? { thought: r.reason } : {}), suggested: Number(r.suggested_drop), labels: r.labels });
   }
   return { latest, extra };
 }

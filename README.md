@@ -1,6 +1,6 @@
 # 우리 얘기 좀 해
 
-다섯 마디 안에 연인(남자친구 윤재 또는 여자친구 서아)의 마음을 돌리는 대화 게임. 두 연인은 이름과 성별만 다르고 성격·장면·첫 대사는 같다 (`server/content.ts`의 `PARTNERS`). 대화가 끝나면 그 대화가 사실 은하연애위원회에 생중계되고 있었다는 반전과 함께, 내가 한 말 하나하나가 바꿔 놓은 미래가 공개된다. 사람들이 AI와 어떻게 대화하고 설득하는지 데이터를 모으기 위한 실험이다.
+다섯 마디 안에 연인(남자친구 윤재 또는 여자친구 서아)의 마음을 돌리는 대화 게임. 두 연인은 이름과 성별만 다르고 성격·장면·첫 대사는 같다 (`server/content.ts`의 `PARTNERS`). 대화가 끝나면 대화 리포트가 나온다. 마디마다 내 말, 연인의 대답, 그 말로 마음이 몇 % 움직였는지(+%), 그리고 대화 중에는 숨겨져 있던 연인의 속마음이 공개된다. 사람들이 AI와 어떻게 대화하고 설득하는지 데이터를 모으기 위한 실험이다.
 
 NPC 프롬프트 구조(엔진 규칙 / 공통 원칙 / 인물 Core)와 "LLM은 제안, 엔진이 확정" 원칙은 [relationship-engine](https://github.com/happy7yong/relationship-engine)에서 가져왔다.
 
@@ -8,12 +8,12 @@ NPC 프롬프트 구조(엔진 규칙 / 공통 원칙 / 인물 Core)와 "LLM은 
 
 | 위치 | 역할 |
 | --- | --- |
-| `src/` | Vite + React 화면 (시작 → 상황 카드 → 대화 → 엔딩 4막) |
+| `src/` | Vite + React 화면 (시작 → 상황 카드 → 대화 → 대화 리포트) |
 | `api/` | Vercel Functions: `start`, `turn`, `finish`, `stats` |
 | `server/rules.ts` | 게임 규칙과 점수 확정 (턴당 최대 하락, 압박 상한, 엔딩 판정) |
 | `server/content.ts` | 시나리오, 윤재 Core, 평가 기준 |
 | `server/npc.ts` | NPC 호출과 출력 검증 |
-| `server/ending.ts` | 대화 전체로 미래 갈림길을 계산하고 연표 문장을 생성 |
+| `server/report.ts` | 저장된 대화로 리포트를 만든다 (LLM 호출 없음) |
 | `server/token.ts` | 게임 상태를 AES-GCM으로 암호화한 토큰 (클라이언트는 읽지도, 바꾸지도 못함) |
 | `server/llm.ts`, `server/model-config.ts` | OpenRouter 호출, 호출별 설정, 하드 타임아웃, 재시도 1회, 시도별 기록 |
 | `server/store.ts`, `server/sync.ts` | Supabase 저장(필수 기록·부가 trace), 멱등 처리, 저장된 기록으로 상태 따라잡기 |
@@ -45,7 +45,7 @@ npm test
 ## 배포 (Vercel)
 
 1. Vercel에서 이 레포를 Import. Framework는 Vite로 자동 인식된다.
-2. Environment Variables에 `SESSION_SECRET`(16자 이상 랜덤), `OPENROUTER_API_KEY`를 넣는다. 모델을 바꾸려면 `NPC_MODEL`, `ENDING_MODEL`.
+2. Environment Variables에 `SESSION_SECRET`(16자 이상 랜덤), `OPENROUTER_API_KEY`를 넣는다. 모델을 바꾸려면 `NPC_MODEL`.
 3. 로그를 모으려면 Supabase SQL Editor에서 `supabase/schema.sql`을 실행하고 (테이블 `plays`, `turns`, `llm_calls`) `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MAX_TOTAL_PLAYS`를 넣는다. 이걸 연결해야 시작 화면의 "몇 명 중 몇 명이 설득했어요"가 보이고, 같은 토큰으로 마디를 다시 보내거나 엔딩을 반복 생성하는 것도 막힌다.
 4. OpenRouter 콘솔에서 크레딧 한도를 걸어 두면 비용 사고를 막을 수 있다.
 5. 선택: [Microsoft Clarity](https://clarity.microsoft.com)에서 프로젝트를 만들고 ID를 `VITE_CLARITY_ID`에 넣은 뒤 다시 배포한다. 대시보드의 Live users에서 접속 중인 참가자를 실시간으로 보고, 녹화를 볼 수 있다. 녹화는 `play_id` 태그로 Supabase `plays.id`와 맞춰 볼 수 있고, 결과(`outcome`, `shake`)와 이벤트(`turn_sent`, `ending_shown`, `error_*` 등)로 거를 수 있다. 채팅 말풍선은 녹화에 보이게 해 두었고(`data-clarity-unmask`), 입력창에 치는 중인 글자는 Clarity가 항상 가린다.

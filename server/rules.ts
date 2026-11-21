@@ -39,6 +39,8 @@ export interface TurnRecord {
   npc: { type: "dialogue" | "narration"; content: string }[];
   /** 윤재가 이 마디를 끝낸 방식 (예전 기록에는 없을 수 있음) */
   move?: NpcMove;
+  /** 이 말을 들은 연인의 속마음 (리포트에서 공개) */
+  thought?: string;
   suggested: number;
   applied: number;
   labels: StrategyLabel[];

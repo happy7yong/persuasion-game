@@ -64,7 +64,7 @@ export default guarded(async (req, res) => {
   }
 
   const { reply } = result;
-  const next = recordTurn(state, { player: check.text, npc: reply.beats, move: reply.move, suggested: reply.suggested, labels: reply.labels });
+  const next = recordTurn(state, { player: check.text, npc: reply.beats, move: reply.move, thought: reply.reason, suggested: reply.suggested, labels: reply.labels });
   const turn = next.turns.at(-1)!;
   try {
     const saved = await insertTurn(state, {

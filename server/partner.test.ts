@@ -1,7 +1,7 @@
 // 연인 선택: 이름과 성별만 바뀌고 나머지(Core, 장면, 첫 대사)는 같아야 한다.
 import { describe, expect, it } from "vitest";
 import { coreFor, PARTNERS, rubricFor, scenarioFor, sceneFactsFor } from "./content.js";
-import { buildEndingPrompt, planEnding } from "./ending.js";
+import { buildReport } from "./report.js";
 import { buildNpcPrompt, scriptedReply } from "./npc.js";
 import { newGame, recordTurn } from "./rules.js";
 
@@ -35,12 +35,9 @@ describe("연인 선택", () => {
     expect(JSON.stringify(scriptedReply(newGame("f2", Date.now(), false, "f"), "미안해").beats)).not.toContain("윤재");
   });
 
-  it("엔딩 프롬프트도 고른 연인의 이름을 쓴다", () => {
+  it("리포트도 고른 연인의 이름을 쓴다", () => {
     const s = recordTurn(newGame("f3", Date.now(), false, "f"), { player: "안녕", npc: [], suggested: 5, labels: ["emotion"] });
-    const plan = planEnding(s);
-    expect(plan.npcName).toBe("서아");
-    const p = buildEndingPrompt(plan);
-    expect(p.system + p.user).not.toContain("윤재");
+    expect(buildReport(s).npcName).toBe("서아");
   });
 
   it("예전 토큰(연인 정보 없음)은 윤재로 본다", () => {

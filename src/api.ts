@@ -31,20 +31,17 @@ export interface TurnResponse extends Progress {
 
 export type Outcome = "success" | "compromise" | "breakdown" | "giveup";
 
-export interface Ending {
-  plan: {
-    outcome: Outcome;
-    shake: number;
-    lines: { turn: number; text: string; drop: number }[];
-    strongestTurn: number | null;
-    weakestTurn: number | null;
-    forks: { era: string; basis: string; chosen: string; untaken: string[]; decidingTurn: number | null }[];
-  };
-  chains: { turn: number; line: string; drop: number; events: { year: number; text: string }[] }[];
-  headline: { title: string; subtitle: string; quote: string };
-  textbook: string;
-  sideArticles: string[];
-  untaken: { instead: string; events: string[] };
+/** 대화 리포트 (server/report.ts). 숫자는 모두 움직인 정도(+%) */
+export interface Report {
+  kind: "report";
+  v: 1;
+  npcName: string;
+  outcome: Outcome;
+  shake: number;
+  successShake: number;
+  turns: { turn: number; player: string; npc: Beat[]; gain: number; total: number; thought: string | null }[];
+  strongestTurn: number | null;
+  weakestTurn: number | null;
 }
 
 export interface Stats {
@@ -92,7 +89,7 @@ export const newKey = (): string =>
 export const api = {
   start: (heardBefore: boolean, partner: Partner) => post<StartResponse>("/api/start", { consent: true, heardBefore, partner }),
   turn: (token: string, message: string, key: string) => post<TurnResponse>("/api/turn", { token, message, idempotency_key: key }),
-  finish: (token: string, giveup: boolean) => post<{ token: string; ending: Ending; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
+  finish: (token: string, giveup: boolean) => post<{ token: string; report: Report; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
   stats: async (): Promise<Stats | null> => {
     try {
       const res = await fetch("/api/stats");
