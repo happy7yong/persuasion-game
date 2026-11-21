@@ -53,7 +53,7 @@ export function ReportView({ report, stats, onRetry }: { report: Report; stats: 
   };
 
   return (
-    <main className="report">
+    <main className="report" data-clarity-unmask="true">
       <section className="report-summary">
         <p className={`report-outcome ${outcome}`}>{OUTCOME[outcome].name}</p>
         <h1 className="report-title">
