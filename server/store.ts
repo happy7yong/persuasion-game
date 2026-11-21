@@ -92,6 +92,32 @@ export async function playFinished(playId: string): Promise<boolean> {
   return Boolean(rows[0]?.finished_at);
 }
 
+// ------------------------------------------------------------------ belief ("내가 본 너")
+
+export async function storedBelief(playId: string): Promise<unknown | null> {
+  if (!storeEnabled()) return null;
+  const res = await ok(await rest(`plays?select=belief&id=eq.${encodeURIComponent(playId)}`, { method: "GET" }));
+  const rows = (await res.json()) as { belief?: unknown }[];
+  return rows[0]?.belief ?? null;
+}
+
+export async function saveBelief(playId: string, belief: unknown): Promise<void> {
+  if (!storeEnabled()) return;
+  await ok(await rest(`plays?id=eq.${encodeURIComponent(playId)}`, { method: "PATCH", prefer: "return=minimal", body: { belief } }));
+}
+
+/** 플레이어가 "맞아 / 좀 달라"를 고른 결과. 마지막 선택이 남는다. */
+export async function saveBeliefFeedback(playId: string, verdict: "agree" | "disagree"): Promise<void> {
+  if (!storeEnabled()) return;
+  await ok(
+    await rest(`plays?id=eq.${encodeURIComponent(playId)}`, {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: { belief_feedback: verdict, belief_feedback_at: new Date().toISOString() },
+    }),
+  );
+}
+
 // ------------------------------------------------------------------ turns
 
 export interface StoredTurn {
@@ -101,6 +127,7 @@ export interface StoredTurn {
   npc_beats: { type: "narration" | "dialogue"; content: string }[];
   npc_move: NpcMove | null;
   reason?: string | null;
+  noticed?: string | null;
   suggested_drop: number;
   labels: StrategyLabel[];
 }
@@ -109,7 +136,7 @@ export interface StoredTurn {
 export async function listTurns(playId: string): Promise<StoredTurn[] | null> {
   if (!storeEnabled()) return null;
   const res = await ok(
-    await rest(`turns?select=idx,idempotency_key,player_text,npc_beats,npc_move,reason,suggested_drop,labels&play_id=eq.${encodeURIComponent(playId)}&order=idx.asc`, {
+    await rest(`turns?select=idx,idempotency_key,player_text,npc_beats,npc_move,reason,noticed,suggested_drop,labels&play_id=eq.${encodeURIComponent(playId)}&order=idx.asc`, {
       method: "GET",
     }),
   );
@@ -130,7 +157,7 @@ export async function insertTurn(
 
 // ------------------------------------------------------------------ trace (부가 기록)
 
-export async function saveAttempts(playId: string, callType: "npc_turn", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
+export async function saveAttempts(playId: string, callType: "npc_turn" | "belief", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
   if (!storeEnabled() || attempts.length === 0) return;
   try {
     const res = await rest("llm_calls", {

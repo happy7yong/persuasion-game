@@ -16,7 +16,7 @@ const goodNpc = JSON.stringify({ beats: [{ type: "dialogue", content: "응" }], 
 
 describe("시간 예산", () => {
   it("재시도까지 포함한 예산이 함수 상한 안에 들어간다", () => {
-    for (const t of ["npc_turn"] as const) {
+    for (const t of ["npc_turn", "belief"] as const) {
       const c = modelConfig(t);
       expect(c.timeoutMs * c.maxAttempts).toBeLessThanOrEqual(c.budgetMs);
       expect(c.budgetMs).toBeLessThan(FUNCTION_MAX_DURATION_MS);

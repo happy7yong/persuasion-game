@@ -41,6 +41,8 @@ export interface TurnRecord {
   move?: NpcMove;
   /** 이 말을 들은 연인의 속마음 (리포트에서 공개) */
   thought?: string;
+  /** 이 말에서 연인이 플레이어에 대해 알게 된 것 ("내가 본 너"의 근거) */
+  noticed?: string;
   suggested: number;
   applied: number;
   labels: StrategyLabel[];

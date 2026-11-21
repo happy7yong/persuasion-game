@@ -15,7 +15,10 @@ create table if not exists plays (
   chars_used int,
   ending_model text,
   ending_usage jsonb,
-  ending jsonb
+  ending jsonb,                     -- 대화 리포트
+  belief jsonb,                     -- "내가 본 너" (판단·근거·예상)
+  belief_feedback text,             -- agree | disagree
+  belief_feedback_at timestamptz
 );
 
 create table if not exists turns (
@@ -27,6 +30,7 @@ create table if not exists turns (
   player_text text not null,
   npc_beats jsonb not null,
   npc_move text,                    -- counter | ask | concede | linger (서버가 정한 끝맺음)
+  noticed text,                     -- 이 말에서 연인이 플레이어에 대해 알게 된 것 ("내가 본 너"의 근거)
   suggested_drop numeric not null,
   applied_drop int not null,
   labels text[] not null,
@@ -43,7 +47,7 @@ create table if not exists turns (
 create table if not exists llm_calls (
   id bigint generated always as identity primary key,
   play_id text not null references plays(id) on delete cascade,
-  call_type text not null,          -- npc_turn | ending
+  call_type text not null,          -- npc_turn | belief
   turn_idx int,                     -- ending이면 null
   attempt int not null,             -- 1, 2 (자동 재시도)
   prompt_version text,
@@ -79,9 +83,13 @@ alter table plays add column if not exists chars_used int;
 alter table plays add column if not exists ending_model text;
 alter table plays add column if not exists ending_usage jsonb;
 alter table plays add column if not exists ending jsonb;
+alter table plays add column if not exists belief jsonb;
+alter table plays add column if not exists belief_feedback text;
+alter table plays add column if not exists belief_feedback_at timestamptz;
 
 alter table turns add column if not exists idempotency_key text;
 alter table turns add column if not exists npc_move text;
+alter table turns add column if not exists noticed text;
 alter table turns add column if not exists applied_drop int;
 alter table turns add column if not exists score_after int;
 alter table turns add column if not exists reason text;

@@ -44,6 +44,15 @@ export interface Report {
   weakestTurn: number | null;
 }
 
+/** "내가 본 너" (server/belief.ts). 연인의 관점이라 틀릴 수 있다 */
+export interface Belief {
+  kind: "belief";
+  npcName: string;
+  summary: string;
+  points: { claim: string; turn: number; quote: string; why: string }[];
+  expectation: string;
+}
+
 export interface Stats {
   total: number;
   finished: number;
@@ -90,6 +99,8 @@ export const api = {
   start: (heardBefore: boolean, partner: Partner) => post<StartResponse>("/api/start", { consent: true, heardBefore, partner }),
   turn: (token: string, message: string, key: string) => post<TurnResponse>("/api/turn", { token, message, idempotency_key: key }),
   finish: (token: string, giveup: boolean) => post<{ token: string; report: Report; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
+  belief: (token: string) => post<{ belief: Belief }>("/api/belief", { token }),
+  feedback: (token: string, verdict: "agree" | "disagree") => post<{ ok: true }>("/api/feedback", { token, verdict }),
   stats: async (): Promise<Stats | null> => {
     try {
       const res = await fetch("/api/stats");

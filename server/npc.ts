@@ -15,6 +15,7 @@ export const NpcOutputSchema = z.object({
     suggested_drop: z.number(),
     labels: z.array(z.string()).default([]),
     reason: z.string().default(""),
+    noticed: z.string().default(""),
   }),
 });
 
@@ -24,6 +25,8 @@ export interface NpcReply {
   suggested: number;
   labels: StrategyLabel[];
   reason: string;
+  /** 이번 말에서 플레이어에 대해 알게 된 것 (마지막 판단의 근거) */
+  noticed: string;
   model: string;
   usage: LlmUsage | null;
 }
@@ -55,6 +58,7 @@ export function parseNpcOutput(raw: unknown, move: NpcMove = "counter", strict =
     suggested: out.evaluation.suggested_drop,
     labels: [...new Set(out.evaluation.labels.filter(isLabel))],
     reason: out.evaluation.reason.slice(0, 80),
+    noticed: out.evaluation.noticed.trim().slice(0, 80),
   };
 }
 
@@ -93,7 +97,7 @@ function beatLine(b: { type: string; content: string }) {
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "yunjae@4";
+export const NPC_PROMPT_VERSION = "yunjae@5";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
@@ -113,11 +117,12 @@ export const NPC_JSON_SCHEMA = {
     evaluation: {
       type: "object",
       additionalProperties: false,
-      required: ["suggested_drop", "labels", "reason"],
+      required: ["suggested_drop", "labels", "reason", "noticed"],
       properties: {
         suggested_drop: { type: "integer" },
         labels: { type: "array", items: { type: "string", enum: [...STRATEGY_LABELS] } },
         reason: { type: "string" },
+        noticed: { type: "string" },
       },
     },
   },
@@ -171,6 +176,7 @@ export function scriptedReply(state: GameState, text: string): NpcReply {
     suggested,
     labels,
     reason: labels.includes("pressure") ? "그렇게 말하면 나도 좀 억울한데" : labels.length > 1 ? "이건 좀 마음에 남는다" : "음… 아직은 잘 모르겠음",
+    noticed: labels.includes("compromise") ? "방법부터 꺼내는 편" : labels.includes("emotion") ? "서운한 걸 바로 말하는 편" : "아직 잘 모르겠음",
     model: "scripted",
     usage: null,
   };

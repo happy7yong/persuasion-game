@@ -41,7 +41,7 @@ export function App() {
     );
   }
   if (session.ending) {
-    return <ReportView report={session.ending.data} stats={session.ending.stats} onRetry={restart} />;
+    return <ReportView report={session.ending.data} stats={session.ending.stats} token={session.token} onRetry={restart} />;
   }
   return <Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} />;
 }

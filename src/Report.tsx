@@ -1,6 +1,7 @@
 // 대화 리포트: 마디마다 내 말, 연인의 대답, 움직인 %(+), 연인의 속마음.
 import { useEffect, useState } from "react";
 import type { Outcome, Report, Stats } from "./api";
+import { BeliefCard } from "./BeliefCard";
 import { track } from "./clarity";
 
 // 연인 이름은 모두 받침이 없어 조사가 같다 (server/content.ts PARTNERS)
@@ -29,7 +30,7 @@ function useCountUp(to: number): number {
   return n;
 }
 
-export function ReportView({ report, stats, onRetry }: { report: Report; stats: Stats | null; onRetry: () => void }) {
+export function ReportView({ report, stats, token, onRetry }: { report: Report; stats: Stats | null; token: string; onRetry: () => void }) {
   const { npcName, outcome, shake, successShake, turns } = report;
   const shown = useCountUp(shake);
   const [copied, setCopied] = useState("");
@@ -88,7 +89,7 @@ export function ReportView({ report, stats, onRetry }: { report: Report; stats: 
         {turns.map((t) => {
           const badge = t.turn === report.strongestTurn ? "가장 많이 움직인 말" : t.turn === report.weakestTurn ? "가장 덜 움직인 말" : null;
           return (
-            <li key={t.turn} className={`turn-card ${t.turn === report.strongestTurn ? "best" : ""}`}>
+            <li key={t.turn} id={`turn-${t.turn}`} className={`turn-card ${t.turn === report.strongestTurn ? "best" : ""}`}>
               <div className="turn-head">
                 <span className="turn-no">{t.turn}번째 말</span>
                 {badge && <span className="turn-badge">{badge}</span>}
@@ -127,6 +128,8 @@ export function ReportView({ report, stats, onRetry }: { report: Report; stats: 
           );
         })}
       </ol>
+
+      <BeliefCard token={token} npcName={npcName} />
 
       <div className="report-actions">
         <button className="primary" onClick={() => (track("retry_clicked"), onRetry())}>
