@@ -43,6 +43,17 @@ npm run dev
 npm test
 ```
 
+## 터미널에서 말투 보기
+
+웹과 같은 서버 코드(프롬프트, 점수 규칙, 끝맺음)로 터미널에서 대화한다. Supabase에는 기록하지 않는다. `.env` 또는 `.env.local`에 `OPENROUTER_API_KEY`가 있어야 실제 모델로 동작한다.
+
+```bash
+npm run play          # 윤재와 대화 (서아: npm run play -- f)
+npm run tone          # 정해 둔 첫마디 5개에 대한 대답을 한 번에 출력
+```
+
+대화 중 `/again`은 방금 대답을 같은 말로 다시 생성하고(말투 비교용), `/prompt`는 모델에 들어간 프롬프트를, `/quit`은 종료한다. 마디마다 끝맺음 방식, 오른 %, 라벨, 속마음, 알게 된 것이 보이고, 끝나면 "○○가 본 너"까지 나온다.
+
 ## 배포 (Vercel)
 
 1. Vercel에서 이 레포를 Import. Framework는 Vite로 자동 인식된다.
