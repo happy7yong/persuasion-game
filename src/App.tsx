@@ -322,6 +322,12 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
           </li>
         )}
         {closing && <li className="closing">위원회 발언 시간이 종료되었습니다</li>}
+        {closing && !notice && (
+          <li className="loading" role="status">
+            <span className="spinner" aria-hidden="true" />
+            은하 신문을 인쇄하는 중…
+          </li>
+        )}
       </ol>
       <div ref={endRef} className="thread-end" />
 

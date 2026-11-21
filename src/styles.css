@@ -91,6 +91,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--line); animation: blink 1s infinite; }
 .typing span:nth-child(2) { animation-delay: 0.15s; }
 .typing span:nth-child(3) { animation-delay: 0.3s; }
+.loading { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 4px 0 24px; color: var(--muted); font-size: 14px; animation: pop 0.4s ease-out 0.6s both; }
+.spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--indigo); animation: spin 0.9s linear infinite; }
 .thread-end { scroll-margin-bottom: 220px; }
 .closing { margin: 26px 0; text-align: center; font-weight: 700; color: var(--indigo); letter-spacing: -0.01em; animation: pop 0.6s ease-out; }
 
@@ -161,9 +163,12 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes crawl { to { transform: translateX(-100%); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .ticker-track { padding-left: 16px; }
+  /* 움직임을 줄인 설정에서도 기다리는 중임은 보이게: 천천히 깜빡인다 */
+  .spinner { animation: blink 2s steps(2) infinite !important; }
 }
