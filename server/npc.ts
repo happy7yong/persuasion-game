@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { BAND_GUIDE, COMMON_PRINCIPLES, ENGINE_RULES, NPC_CORE, OUTPUT_FORMAT, SCENARIO, SCENE_FACTS, SCORING_RUBRIC } from "./content.js";
-import { callJson, extractJson, isScripted, type LlmUsage } from "./llm.js";
+import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
+import { modelConfig } from "./model-config.js";
 import { band, STRATEGY_LABELS, type GameState, type StrategyLabel } from "./rules.js";
 
 const BeatSchema = z.object({
@@ -63,21 +64,53 @@ function fmtBeat(b: { type: string; content: string }) {
   return b.type === "narration" ? `(${b.content})` : `"${b.content}"`;
 }
 
-export async function npcReply(state: GameState, playerText: string): Promise<NpcReply> {
-  if (isScripted()) return scriptedReply(state, playerText);
+/** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
+export const NPC_PROMPT_VERSION = "yunjae@1";
+
+/** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
+export const NPC_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["beats", "evaluation"],
+  properties: {
+    beats: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "content"],
+        properties: { type: { type: "string", enum: ["narration", "dialogue"] }, content: { type: "string" } },
+      },
+    },
+    evaluation: {
+      type: "object",
+      additionalProperties: false,
+      required: ["suggested_drop", "labels", "reason"],
+      properties: {
+        suggested_drop: { type: "integer" },
+        labels: { type: "array", items: { type: "string", enum: [...STRATEGY_LABELS] } },
+        reason: { type: "string" },
+      },
+    },
+  },
+} as const;
+
+export type NpcResult =
+  | { ok: true; reply: NpcReply; attempts: AttemptRecord[] }
+  | { ok: false; failure: LlmFailure; attempts: AttemptRecord[] };
+
+export async function npcReply(state: GameState, playerText: string): Promise<NpcResult> {
+  if (isScripted()) return { ok: true, reply: scriptedReply(state, playerText), attempts: [] };
+  const cfg = modelConfig("npc_turn");
   const prompt = buildNpcPrompt(state, playerText);
-  const model = process.env.NPC_MODEL || "openai/gpt-5.4-mini";
-  let lastError: unknown;
-  // 형식이 깨지면 한 번만 다시 시도한다.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const res = await callJson({ model, ...prompt, maxTokens: 700 });
-      return { ...parseNpcOutput(extractJson(res.text)), model: res.model, usage: res.usage };
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  throw lastError;
+  const res = await callWithRetry(cfg, { ...prompt, schemaName: "npc_turn", schema: NPC_JSON_SCHEMA }, parseNpcOutput);
+  if (!res.ok) return res;
+  const last = res.attempts.at(-1);
+  return {
+    ok: true,
+    reply: { ...res.value, model: last?.respondedModel ?? cfg.model, usage: last?.usage ?? null },
+    attempts: res.attempts,
+  };
 }
 
 /** 키 없이 화면을 확인하는 대본 모드. 점수는 말의 특징으로 대충 정한다. */

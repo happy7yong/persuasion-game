@@ -1,36 +1,36 @@
-// 게임 상태를 HMAC으로 서명한 토큰. DB 없이도 클라이언트가 상태를 조작할 수 없다.
-import { createHmac, timingSafeEqual } from "node:crypto";
+// 게임 상태 토큰. AES-256-GCM으로 암호화하므로 클라이언트는 상태를 읽을 수도(숨긴 마음 지수 포함),
+// 바꿀 수도 없다. 바꾸면 인증 태그가 맞지 않아 거부된다.
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import type { GameState } from "./rules.js";
 
-const MAX_AGE_MS = 1000 * 60 * 60 * 6;
+export const TOKEN_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 
-function secret(): string {
-  const s = process.env.SESSION_SECRET;
-  if (s && s.length >= 16) return s;
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-    throw new Error("SESSION_SECRET is not set (16자 이상 필요)");
+function key(): Buffer {
+  let s = process.env.SESSION_SECRET;
+  if (!s || s.length < 16) {
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV) throw new Error("SESSION_SECRET is not set (16자 이상 필요)");
+    s = "dev-only-secret-change-me";
   }
-  return "dev-only-secret-change-me";
+  return createHash("sha256").update(`persuasion-game/token/v2:${s}`).digest();
 }
 
-const b64 = (buf: Buffer) => buf.toString("base64url");
-const sign = (body: string) => b64(createHmac("sha256", secret()).update(body).digest());
-
 export function encodeState(state: GameState): string {
-  const body = b64(Buffer.from(JSON.stringify(state), "utf8"));
-  return `${body}.${sign(body)}`;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  const body = Buffer.concat([cipher.update(JSON.stringify(state), "utf8"), cipher.final()]);
+  return ["v2", iv.toString("base64url"), body.toString("base64url"), cipher.getAuthTag().toString("base64url")].join(".");
 }
 
 export function decodeState(token: unknown, now = Date.now()): GameState | null {
-  if (typeof token !== "string") return null;
-  const [body, mac] = token.split(".");
-  if (!body || !mac) return null;
-  const expected = Buffer.from(sign(body));
-  const given = Buffer.from(mac);
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  if (typeof token !== "string" || token.length > 64_000) return null;
+  const [v, iv, body, tag] = token.split(".");
+  if (v !== "v2" || !iv || !body || !tag) return null;
   try {
-    const state = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as GameState;
-    if (state.v !== 1 || now - state.startedAt > MAX_AGE_MS) return null;
+    const decipher = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    const json = Buffer.concat([decipher.update(Buffer.from(body, "base64url")), decipher.final()]).toString("utf8");
+    const state = JSON.parse(json) as GameState;
+    if (state.v !== 1 || now - state.startedAt > TOKEN_MAX_AGE_MS) return null;
     return state;
   } catch {
     return null;

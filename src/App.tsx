@@ -1,52 +1,44 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, type Beat, type Ending as EndingData, type StartResponse, type Stats } from "./api";
+import { api, ApiError, newKey, type Beat, type Exchange, type StartResponse, type Stats } from "./api";
 import { Ending } from "./Ending";
-
-type Msg = { id: number; who: "npc" | "me"; beat: Beat };
-type Phase = "intro" | "chat" | "closing" | "ending";
+import { clearGame, loadGame, saveGame, type Msg, type SavedGame } from "./storage";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const reduceMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const chars = (s: string) => Array.from(s).length;
 
 export function App() {
-  const [phase, setPhase] = useState<Phase>("intro");
+  const [session, setSession] = useState<SavedGame | null>(() => loadGame());
   const [stats, setStats] = useState<Stats | null>(null);
-  const [game, setGame] = useState<StartResponse | null>(null);
-  const [ending, setEnding] = useState<{ data: EndingData; stats: Stats | null } | null>(null);
-  const tokenRef = useRef("");
 
   useEffect(() => {
-    void api.stats().then(setStats);
-  }, []);
+    if (!session) void api.stats().then(setStats);
+  }, [session === null]);
 
-  const begin = (g: StartResponse) => {
-    tokenRef.current = g.token;
-    setGame(g);
-    setEnding(null);
-    setPhase("chat");
-  };
+  useEffect(() => {
+    if (session) saveGame(session);
+  }, [session]);
 
-  const reveal = (data: EndingData, s: Stats | null) => {
-    setEnding({ data, stats: s });
-    setPhase("ending");
+  const restart = () => {
+    clearGame();
+    setSession(null);
     window.scrollTo({ top: 0 });
   };
 
-  if (phase === "intro" || !game) return <Intro stats={stats} onStart={begin} />;
-  if (phase === "ending" && ending)
+  if (!session) {
     return (
-      <Ending
-        data={ending.data}
-        stats={ending.stats}
-        npcName={game.scenario.npcName}
-        onRetry={() => {
-          setPhase("intro");
-          void api.stats().then(setStats);
-        }}
+      <Intro
+        stats={stats}
+        onStart={(g) =>
+          setSession({ v: 1, game: g, token: g.token, msgs: [], turns: 0, left: g.rules.charBudget, finished: false, ending: null })
+        }
       />
     );
-  return <Chat game={game} tokenRef={tokenRef} closing={phase === "closing"} onClosing={() => setPhase("closing")} onEnding={reveal} />;
+  }
+  if (session.ending) {
+    return <Ending data={session.ending.data} stats={session.ending.stats} npcName={session.game.scenario.npcName} onRetry={restart} />;
+  }
+  return <Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} />;
 }
 
 function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResponse) => void }) {
@@ -60,7 +52,7 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
     setBusy(true);
     setError("");
     try {
-      onStart(await api.start(true, heard));
+      onStart(await api.start(heard));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "문제가 생겼어요. 다시 시도해 주세요.");
       setBusy(false);
@@ -102,7 +94,11 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
           <input type="checkbox" checked={heard} onChange={(e) => setHeard(e.target.checked)} />
           <span>이 게임에 대해 미리 들어봤어요</span>
         </label>
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
         <button className="primary" onClick={start} disabled={busy}>
           {busy ? "카페로 가는 중…" : "대화 시작하기"}
         </button>
@@ -136,49 +132,58 @@ function KakaoCard({ game }: { game: StartResponse }) {
   );
 }
 
-function Chat({
-  game,
-  tokenRef,
-  closing,
-  onClosing,
-  onEnding,
-}: {
-  game: StartResponse;
-  tokenRef: React.MutableRefObject<string>;
-  closing: boolean;
-  onClosing: () => void;
-  onEnding: (e: EndingData, s: Stats | null) => void;
-}) {
+type Notice = { kind: "error" | "info"; text: string; action?: "restart" | "finish" };
+
+function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: Partial<SavedGame>) => void; onRestart: () => void }) {
+  const { game } = session;
   const { rules, scenario } = game;
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [msgs, setMsgs] = useState<Msg[]>(session.msgs);
   const [text, setText] = useState("");
-  const [turns, setTurns] = useState(0);
-  const [left, setLeft] = useState(rules.charBudget);
   const [busy, setBusy] = useState(true);
   const [typing, setTyping] = useState(false);
-  const [error, setError] = useState("");
-  const [finished, setFinished] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [confirmGiveup, setConfirmGiveup] = useState(false);
-  const idRef = useRef(0);
+  const tokenRef = useRef(session.token);
+  const pending = useRef<{ text: string; key: string } | null>(null);
+  const idRef = useRef(session.msgs.reduce((m, x) => Math.max(m, x.id + 1), 0));
   const endRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
-  const push = (who: Msg["who"], beat: Beat) => setMsgs((m) => [...m, { id: idRef.current++, who, beat }]);
+  // 화면에 보이는 대화를 저장해 둔다 (새로고침 복구)
+  useEffect(() => {
+    update({ msgs });
+  }, [msgs]);
 
-  const playBeats = async (beats: Beat[]) => {
+  const push = (who: Msg["who"], beat: Beat): number => {
+    const id = idRef.current++; // 업데이트 함수 밖에서 정해야 StrictMode 이중 실행에도 id가 그대로다
+    setMsgs((m) => [...m, { id, who, beat }]);
+    return id;
+  };
+
+  const playBeats = async (beats: Beat[], animate = true) => {
     for (const b of beats) {
-      setTyping(true);
-      await wait(reduceMotion() ? 0 : Math.min(1400, 450 + chars(b.content) * 18));
-      setTyping(false);
+      if (animate && !reduceMotion()) {
+        setTyping(true);
+        await wait(Math.min(1400, 450 + chars(b.content) * 18));
+        setTyping(false);
+      }
       push("npc", b);
-      await wait(reduceMotion() ? 0 : 250);
+      if (animate && !reduceMotion()) await wait(250);
     }
+  };
+
+  const applyProgress = (p: { token: string; turnsUsed: number; charsLeft: number; finished: boolean }) => {
+    tokenRef.current = p.token;
+    update({ token: p.token, turns: p.turnsUsed, left: p.charsLeft, finished: p.finished });
   };
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void playBeats(scenario.opening).then(() => setBusy(false));
+    if (session.msgs.length === 0) void playBeats(scenario.opening).then(() => setBusy(false));
+    else if (session.finished) void goEnding(false);
+    else setBusy(false);
   }, []);
 
   useEffect(() => {
@@ -186,52 +191,96 @@ function Chat({
   }, [msgs, typing, closing]);
 
   const goEnding = async (giveup: boolean) => {
-    onClosing();
-    setError("");
+    setClosing(true);
+    setNotice(null);
     await wait(reduceMotion() ? 0 : 1600);
     try {
       const res = await api.finish(tokenRef.current, giveup);
       tokenRef.current = res.token;
-      onEnding(res.ending, res.stats);
+      update({ token: res.token, finished: true, ending: { data: res.ending, stats: res.stats } });
+      window.scrollTo({ top: 0 });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "결과를 불러오지 못했어요. 다시 시도해 주세요.");
+      const err = e instanceof ApiError ? e : null;
+      setNotice({
+        kind: "error",
+        text: err?.message ?? "결과를 불러오지 못했어요. 다시 시도해 주세요.",
+        action: err?.code === "session_expired" ? "restart" : "finish",
+      });
+    }
+  };
+
+  /** 서버 기록에 맞춰 대화를 이어 붙인다 (응답을 못 받았던 마디 포함). */
+  const appendExchanges = async (exchanges: Exchange[], animateLast: boolean) => {
+    for (const [i, ex] of exchanges.entries()) {
+      push("me", { type: "dialogue", content: ex.player });
+      await playBeats(ex.beats, animateLast && i === exchanges.length - 1);
     }
   };
 
   const send = async () => {
     const msg = text.trim();
-    if (!msg) return setError("할 말을 입력해 주세요.");
-    if (chars(msg) > rules.messageMax) return setError(`한 번에 ${rules.messageMax}자까지 말할 수 있어요.`);
-    if (chars(msg) > left) return setError(`발언권이 ${left}자 남았어요.`);
+    if (!msg) return setNotice({ kind: "error", text: "할 말을 입력해 주세요." });
+    if (chars(msg) > rules.messageMax) return setNotice({ kind: "error", text: `한 번에 ${rules.messageMax}자까지 말할 수 있어요.` });
+    if (chars(msg) > session.left) return setNotice({ kind: "error", text: `발언권이 ${session.left}자 남았어요.` });
+    // 같은 말을 다시 보내면 같은 키 (서버가 처음 결과를 돌려준다). 말을 바꾸면 새 키.
+    const key = pending.current?.text === msg ? pending.current.key : newKey();
+    pending.current = { text: msg, key };
     setBusy(true);
-    setError("");
-    push("me", { type: "dialogue", content: msg });
+    setNotice(null);
+    const optimisticId = push("me", { type: "dialogue", content: msg });
     setText("");
     setTyping(true);
+    let finished = false;
     try {
-      const res = await api.turn(tokenRef.current, msg);
-      tokenRef.current = res.token;
-      setTurns(res.turnsUsed);
-      setLeft(res.charsLeft);
+      const res = await api.turn(tokenRef.current, msg, key);
+      pending.current = null;
       setTyping(false);
-      await playBeats(res.beats);
-      if (res.finished) {
-        setFinished(true);
-        await wait(reduceMotion() ? 0 : 900);
-        await goEnding(false);
-      } else setBusy(false);
+      setMsgs((m) => m.filter((x) => x.id !== optimisticId));
+      applyProgress(res);
+      await appendExchanges(res.exchanges, true);
+      finished = res.finished;
     } catch (e) {
       setTyping(false);
-      setMsgs((m) => m.slice(0, -1));
-      setText(msg);
-      setError(e instanceof ApiError ? e.message : "문제가 생겼어요. 다시 보내 주세요.");
-      setBusy(false);
+      setMsgs((m) => m.filter((x) => x.id !== optimisticId));
+      const err = e instanceof ApiError ? e : new ApiError("unknown", "문제가 생겼어요. 다시 보내 주세요.", true);
+      if (err.resync) {
+        // 이미 기록된 마디가 있었다: 기록을 보여 주고, 방금 쓴 말은 입력창에 돌려준다.
+        pending.current = null;
+        applyProgress(err.resync);
+        await appendExchanges(err.resync.exchanges, false);
+        finished = err.resync.finished;
+        if (!finished && err.resync.exchanges.at(-1)?.player !== msg) setText(msg);
+        if (err.resync.exchanges.length > 0) setNotice({ kind: "info", text: err.message });
+      } else {
+        setText(msg);
+        setNotice({ kind: "error", text: err.message, ...(err.code === "session_expired" ? { action: "restart" as const } : {}) });
+      }
     }
+    if (finished) {
+      await wait(reduceMotion() ? 0 : 900);
+      await goEnding(false);
+    } else setBusy(false);
   };
 
   const msgLen = chars(text);
-  const over = msgLen > rules.messageMax || msgLen > left;
-  const pct = Math.max(0, (left / rules.charBudget) * 100);
+  const over = msgLen > rules.messageMax || msgLen > session.left;
+  const pct = Math.max(0, (session.left / rules.charBudget) * 100);
+
+  const noticeView = notice && (
+    <div className={notice.kind === "error" ? "notice error" : "notice info"} role={notice.kind === "error" ? "alert" : "status"}>
+      <p>{notice.text}</p>
+      {notice.action === "restart" && (
+        <button className="primary small" onClick={onRestart}>
+          처음부터 다시 하기
+        </button>
+      )}
+      {notice.action === "finish" && (
+        <button className="primary small" onClick={() => void goEnding(!session.finished)}>
+          결과 다시 불러오기
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <main className="chat">
@@ -242,12 +291,12 @@ function Chat({
         </div>
         <div className="chat-meter">
           <span className="chat-turn">
-            {Math.min(turns + 1, rules.maxTurns)}/{rules.maxTurns}번째 말
+            {Math.min(session.turns + 1, rules.maxTurns)}/{rules.maxTurns}번째 말
           </span>
-          <div className="budget" role="meter" aria-label="남은 발언권" aria-valuemin={0} aria-valuemax={rules.charBudget} aria-valuenow={left}>
+          <div className="budget" role="meter" aria-label="남은 발언권" aria-valuemin={0} aria-valuemax={rules.charBudget} aria-valuenow={session.left}>
             <div className="budget-fill" style={{ width: `${pct}%` }} />
           </div>
-          <span className="chat-left">발언권 {left}자</span>
+          <span className="chat-left">발언권 {session.left}자</span>
         </div>
       </header>
 
@@ -277,19 +326,16 @@ function Chat({
       <div ref={endRef} className="thread-end" />
 
       {closing ? (
-        error && (
-          <div className="composer">
-            <p className="error" role="alert">{error}</p>
-            <button className="primary" onClick={() => void goEnding(!finished)}>
-              결과 다시 불러오기
-            </button>
-          </div>
-        )
+        notice && <div className="composer">{noticeView}</div>
       ) : (
         <div className="composer">
+          {noticeView}
           <textarea
             value={text}
-            onChange={(e) => (setText(e.target.value), setError(""))}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (notice?.kind === "error" && notice.action !== "restart") setNotice(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
@@ -298,13 +344,13 @@ function Chat({
             }}
             placeholder={busy ? "" : `${scenario.npcName}에게 하고 싶은 말`}
             rows={3}
-            disabled={busy}
+            disabled={busy || notice?.action === "restart"}
             aria-label={`${scenario.npcName}에게 할 말`}
             aria-invalid={over}
           />
           <div className="composer-bar">
             <span className={`count ${over ? "over" : ""}`}>
-              {msgLen}/{Math.min(rules.messageMax, left)}자
+              {msgLen}/{Math.min(rules.messageMax, session.left)}자
             </span>
             {confirmGiveup ? (
               <span className="giveup-confirm">
@@ -321,11 +367,10 @@ function Chat({
                 포기하기
               </button>
             )}
-            <button className="primary small" onClick={() => void send()} disabled={busy || over}>
-              말하기
+            <button className="primary small" onClick={() => void send()} disabled={busy || over || notice?.action === "restart"}>
+              {pending.current && pending.current.text === text.trim() ? "다시 보내기" : "말하기"}
             </button>
           </div>
-          {error && <p className="error" role="alert">{error}</p>}
           <p className="composer-hint">한번 한 말은 고칠 수 없어요.</p>
         </div>
       )}

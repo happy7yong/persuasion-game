@@ -1,6 +1,7 @@
 // 엔딩: 경로(갈림길)는 코드가 대화 전체에서 계산하고, LLM은 웃긴 문장만 쓴다.
 import { z } from "zod";
-import { callJson, extractJson, isScripted, type LlmUsage } from "./llm.js";
+import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
+import { modelConfig } from "./model-config.js";
 import { shakePercent, type GameState, type Outcome, type StrategyLabel } from "./rules.js";
 
 /** 마디별 연표 연도. 뒤로 갈수록 스케일이 커진다. */
@@ -183,22 +184,48 @@ export function assembleEnding(plan: EndingPlan, text: EndingText, model: string
   };
 }
 
-export async function writeEnding(state: GameState): Promise<Ending> {
+export const ENDING_PROMPT_VERSION = "galaxy-ending@1";
+
+const STR = { type: "string" } as const;
+export const ENDING_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["chains", "headline", "textbook", "side_articles", "untaken"],
+  properties: {
+    chains: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["turn", "events"],
+        properties: { turn: { type: "integer" }, events: { type: "array", items: STR } },
+      },
+    },
+    headline: { type: "object", additionalProperties: false, required: ["title", "subtitle"], properties: { title: STR, subtitle: STR } },
+    textbook: STR,
+    side_articles: { type: "array", items: STR },
+    untaken: { type: "object", additionalProperties: false, required: ["instead", "events"], properties: { instead: STR, events: { type: "array", items: STR } } },
+  },
+} as const;
+
+export type EndingResult = { ok: true; ending: Ending; attempts: AttemptRecord[] } | { ok: false; failure: LlmFailure; attempts: AttemptRecord[] };
+
+export async function writeEnding(state: GameState): Promise<EndingResult> {
   const plan = planEnding(state);
-  if (plan.lines.length === 0) return assembleEnding(plan, emptyText(), "none", null);
-  if (isScripted()) return assembleEnding(plan, scriptedText(plan), "scripted", null);
-  const model = process.env.ENDING_MODEL || process.env.NPC_MODEL || "openai/gpt-5.4-mini";
+  if (plan.lines.length === 0) return { ok: true, ending: assembleEnding(plan, emptyText(), "none", null), attempts: [] };
+  if (isScripted()) return { ok: true, ending: assembleEnding(plan, scriptedText(plan), "scripted", null), attempts: [] };
+  const cfg = modelConfig("ending");
   const prompt = buildEndingPrompt(plan);
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const res = await callJson({ model, ...prompt, maxTokens: 1600, temperature: 0.95, timeoutMs: 50_000 });
-      return assembleEnding(plan, EndingTextSchema.parse(extractJson(res.text)), res.model, res.usage);
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  throw lastError;
+  const parse = (json: unknown) => {
+    const text = EndingTextSchema.parse(json);
+    // 모든 마디의 연표가 있어야 한다. 빠지면 형식 실패로 보고 다시 시도한다.
+    for (const l of plan.lines) if (!text.chains.some((c) => c.turn === l.turn && c.events.length > 0)) throw new Error(`missing_chain_${l.turn}`);
+    return text;
+  };
+  const res = await callWithRetry(cfg, { ...prompt, schemaName: "galaxy_ending", schema: ENDING_JSON_SCHEMA }, parse);
+  if (!res.ok) return res;
+  const last = res.attempts.at(-1);
+  return { ok: true, ending: assembleEnding(plan, res.value, last?.respondedModel ?? cfg.model, last?.usage ?? null), attempts: res.attempts };
 }
 
 function emptyText(): EndingText {
