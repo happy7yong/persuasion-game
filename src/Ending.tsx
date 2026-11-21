@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Ending as EndingData, Outcome, Stats } from "./api";
 
 const OUTCOME: Record<Outcome, { name: string; note: string }> = {
@@ -32,7 +32,6 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
   const steps = 1 + chains.length + 4; // 방송 시작, 마디별 폭발, 갈림길, 신문, 결과, 마지막
   const [step, setStep] = useState(reduceMotion() ? steps : 0);
   const [copied, setCopied] = useState("");
-  const lastRef = useRef<HTMLDivElement>(null);
   const chainStart = 1;
   const forkStep = chainStart + chains.length;
 
@@ -42,10 +41,6 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
     const t = setTimeout(() => setStep((s) => s + 1), step === 0 ? 2200 : isChain ? 3200 : 2600);
     return () => clearTimeout(t);
   }, [step, steps]);
-
-  useEffect(() => {
-    if (step > 0 && step < steps) lastRef.current?.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "end" });
-  }, [step]);
 
   const share = async () => {
     const text = `나는 ${npcName}의 마음을 ${plan.shake}% 흔들었다. 너는?\n${location.origin}`;
@@ -195,7 +190,6 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
         </section>
       )}
 
-      <div ref={lastRef} />
       {step < steps && (
         <button className="skip" onClick={() => setStep(steps)}>
           한 번에 보기
