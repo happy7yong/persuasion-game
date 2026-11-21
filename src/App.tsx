@@ -98,15 +98,13 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
           </div>
         </fieldset>
         <div className="intro-count" aria-live="polite">
-          {stats && stats.finished > 0 ? (
+          {stats && stats.best !== null ? (
             <>
-              <strong>
-                {stats.finished}명 중 {stats.persuaded}명
-              </strong>
-              이 연인을 설득했어요
+              지금까지 최고 기록 <strong>{stats.best}%</strong>
+              <span className="intro-count-sub">{stats.finished}명이 도전했어요. 이 기록을 넘어 보세요.</span>
             </>
           ) : (
-            <>아직 아무도 연인을 설득하지 못했어요</>
+            <>아직 기록이 없어요. 첫 기록을 세워 보세요.</>
           )}
         </div>
         <ul className="intro-rules">

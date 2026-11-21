@@ -62,7 +62,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .partner-label { font-size: 13px; color: var(--muted); }
 .partner-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .intro-count { background: var(--white); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; font-size: 15px; }
-.intro-count strong { font-size: 20px; margin-right: 2px; }
+.intro-count strong { font-size: 20px; margin-left: 2px; }
+.intro-count-sub { display: block; color: var(--muted); font-size: 14px; margin-top: 2px; }
 .intro-rules { margin: 0 0 20px; padding-left: 18px; color: var(--muted); font-size: 15px; }
 .intro-rules li + li { margin-top: 4px; }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--muted); margin-bottom: 12px; }

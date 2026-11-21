@@ -51,6 +51,8 @@ export interface Stats {
   total: number;
   finished: number;
   persuaded: number;
+  /** 지금까지 가장 많이 흔든 기록(%) */
+  best: number | null;
 }
 
 /** 서버 오류 형식 { error: { code, message, retryable } } (relationship-engine api.md §2.4) */

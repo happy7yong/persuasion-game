@@ -161,9 +161,22 @@ async function count(filter: string): Promise<number | null> {
   }
 }
 
-export async function stats(): Promise<{ finished: number; persuaded: number; total: number } | null> {
+/** 끝난 판 중 가장 많이 흔든 기록(%). 없으면 null. */
+async function bestShake(): Promise<number | null> {
+  try {
+    const res = await rest("plays?select=final_score&finished_at=not.is.null&final_score=not.is.null&order=final_score.asc&limit=1", { method: "GET" });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { final_score: number }[];
+    const best = rows[0]?.final_score;
+    return typeof best === "number" ? Math.max(0, Math.min(100, 100 - best)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function stats(): Promise<{ finished: number; persuaded: number; total: number; best: number | null } | null> {
   if (!storeEnabled()) return null;
-  const [total, finished, persuaded] = await Promise.all([count("id=not.is.null"), count("finished_at=not.is.null"), count("outcome=eq.success")]);
+  const [total, finished, persuaded, best] = await Promise.all([count("id=not.is.null"), count("finished_at=not.is.null"), count("outcome=eq.success"), bestShake()]);
   if (total === null || finished === null || persuaded === null) return null;
-  return { total, finished, persuaded };
+  return { total, finished, persuaded, best };
 }

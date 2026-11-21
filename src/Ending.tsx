@@ -146,9 +146,9 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
             {OUTCOME[plan.outcome].note(npcName)}
             {plan.outcome !== "success" && plan.shake < SUCCESS_SHAKE && ` 설득까지 ${SUCCESS_SHAKE - plan.shake}% 남았어요.`}
           </p>
-          {stats && stats.finished > 0 && (
+          {stats && stats.best !== null && (
             <p className="result-stats">
-              지금까지 {stats.finished}명 중 {stats.persuaded}명이 {npcName}를 설득했어요
+              {plan.shake >= stats.best ? "지금까지 최고 기록이에요!" : `지금까지 최고 기록은 ${stats.best}%예요`}
             </p>
           )}
           {strongest && (
