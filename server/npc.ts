@@ -99,7 +99,7 @@ function beatLine(b: { type: string; content: string }) {
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "yunjae@6";
+export const NPC_PROMPT_VERSION = "yunjae@7";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
