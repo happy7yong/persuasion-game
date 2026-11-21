@@ -141,7 +141,7 @@ export async function attemptOnce(
 export async function callWithRetry<T>(
   cfg: CallModelConfig,
   call: JsonCall,
-  parse: (json: unknown) => T,
+  parse: (json: unknown, attempt: { index: number; last: boolean }) => T,
   fetchImpl: FetchLike = fetch,
   now: () => number = Date.now,
 ): Promise<{ ok: true; value: T; attempts: AttemptRecord[] } | { ok: false; failure: LlmFailure; attempts: AttemptRecord[] }> {
@@ -150,11 +150,13 @@ export async function callWithRetry<T>(
   let failure = new LlmFailure("empty", "not_attempted");
   for (let i = 1; i <= cfg.maxAttempts; i++) {
     if (i > 1 && now() - started + cfg.timeoutMs > cfg.budgetMs) break;
+    // 다음 시도를 할 시간이 남는지로 "마지막 시도"를 판단한다. 마지막 시도에는 parse가 덜 엄격할 수 있다.
+    const last = i === cfg.maxAttempts || now() - started + 2 * cfg.timeoutMs > cfg.budgetMs;
     try {
       const { text, record } = await attemptOnce(cfg, call, i, fetchImpl);
       attempts.push(record);
       try {
-        return { ok: true, value: parse(extractJson(text)), attempts };
+        return { ok: true, value: parse(extractJson(text), { index: i, last }), attempts };
       } catch (e) {
         failure = new LlmFailure("invalid_output", e instanceof Error ? e.message.slice(0, 200) : "parse");
         record.result = failure.message;

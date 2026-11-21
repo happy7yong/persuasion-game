@@ -65,11 +65,15 @@ export function planEnding(state: GameState): EndingPlan {
   }
   if (lines.length < 2 || strongest === weakest) weakest = null;
 
-  const counts = new Map<StrategyLabel, number>();
-  for (const l of lines) for (const lab of l.labels) counts.set(lab, (counts.get(lab) ?? 0) + 1);
+  // 말투는 "몇 번 썼나"가 아니라 "그 말투로 얼마나 흔들었나"로 정한다. 물음표 하나가 문명을 정하지 않게.
+  // 압박은 흔든 양이 거의 없으므로, 압박밖에 없는 판에서만 불도저 문명이 된다.
+  const weight = new Map<StrategyLabel, number>();
+  for (const l of lines) for (const lab of l.labels) weight.set(lab, (weight.get(lab) ?? 0) + Math.max(l.drop, 1));
   let dominant: StrategyLabel | null = null;
-  for (const [lab, n] of counts) if (dominant === null || n > (counts.get(dominant) ?? 0)) dominant = lab;
-  const dominantTurn = dominant ? (lines.find((l) => l.labels.includes(dominant!))?.turn ?? null) : null;
+  for (const [lab, w] of weight) if (dominant === null || w > (weight.get(dominant) ?? 0)) dominant = lab;
+  const dominantTurn = dominant
+    ? (lines.filter((l) => l.labels.includes(dominant!)).sort((a, b) => b.drop - a.drop || a.turn - b.turn)[0]?.turn ?? null)
+    : null;
 
   const apologyTurn = lines.find((l) => l.labels.includes("apology") || /미안/.test(l.text))?.turn ?? null;
   const laughTurn = lines.find((l) => /ㅋㅋ/.test(l.text))?.turn ?? null;
@@ -92,7 +96,7 @@ export function planEnding(state: GameState): EndingPlan {
     },
     {
       era: "3026년",
-      basis: finalKey === "apology" ? "사과를 했는가" : finalKey === "laugh" ? "웃음을 남겼는가" : "끝까지 직진했는가",
+      basis: finalKey === "apology" ? "사과를 했는가" : finalKey === "laugh" ? "웃음을 남겼는가" : "사과도 웃음도 없이 끝까지 갔는가",
       chosen: FINAL_ERA[finalKey],
       untaken: Object.values(FINAL_ERA).filter((v) => v !== FINAL_ERA[finalKey]),
       decidingTurn: finalKey === "apology" ? apologyTurn : finalKey === "laugh" ? laughTurn : (lines.at(-1)?.turn ?? null),
@@ -130,10 +134,17 @@ export function buildEndingPrompt(plan: EndingPlan): { system: string; user: str
 
 # 톤
 - 낙서 몇 번에 주가가 폭락하는 게임처럼, 사소한 말이 터무니없이 거대한 결과로 번지는 과장된 코미디.
-- 해마다 스케일이 커진다: 동네 → 나라 → 세계 → 행성 → 은하. 구체적인 숫자(커플 수, 매출, 주가, 은하크레딧)를 넣는다.
-- 그 말의 실제 단어와 내용이 결과의 원인이 되게 한다. 그 말을 비웃지 않고, 말이 세상을 바꾼 것을 웃기게 쓴다.
+- **한 마디 안에서** 사건 3개가 폭발적으로 커진다: ① 동네·개인 → ② 나라·세계 → ③ 행성·은하. 첫 사건부터 이미 웃겨야 하고, 마지막 사건은 말도 안 되게 거대해야 한다.
+- 숫자를 크고 구체적으로: 커플 수(만 쌍~억 쌍), 매출·주가(%), 은하크레딧, 행성 수. 법·공휴일·국가 기관·외계 종족이 등장해도 좋다.
+- 그 말의 실제 단어와 내용이 결과의 원인이어야 한다. 그 말을 비웃지 않고, 그 말이 세상을 바꿔 버린 것을 웃기게 쓴다. 욕설이나 비속어가 있으면 그 단어를 다시 쓰지 말고 "그 한마디" 등으로 돌려 말한다.
 - 금지: 실존 인물·기업·정치·종교, 죽음·폭력·재난 피해, 외모·몸 비하, 성적 내용.
-- 한국어, 짧고 리듬감 있게. 각 사건 60자 안팎.
+- 한국어, 짧고 리듬감 있게. 각 사건 60자 안팎. 문장 끝은 "~다"로.
+
+# 톤 예시 (그대로 베끼지 말 것)
+말: "바쁘면 미리 말만 해줘"
+① 동네 카페 단골 37명이 회의 전에 "나 회의 들어감"을 보내기 시작한다
+② 사전 고지법 UN 만장일치 통과, 오전 9시 59분마다 전 세계 메신저 서버가 터진다
+③ 외계 문명과의 첫 교신 내용이 "혹시 바쁘시면 미리 말씀해 주시겠어요?"였다, 감동한 외계인 즉시 동맹 체결
 
 # 출력: JSON 하나
 {"chains":[{"turn":1,"events":["...","...","..."]}],"headline":{"title":"...","subtitle":"..."},"textbook":"...","side_articles":["...","..."],"untaken":{"instead":"...","events":["...","..."]}}
@@ -141,7 +152,7 @@ export function buildEndingPrompt(plan: EndingPlan): { system: string; user: str
 - headline: 3026년 은하 신문 1면. title은 가장 결정적인 말이 은하에 남긴 결과, subtitle은 한 줄 부연.
 - textbook: 은하 역사 교과서 1장 첫 문장. "모든 것은 한 지구인이 카페에서 ~라고 한 데서 시작되었다." 형식.
 - side_articles: 관련 짧은 기사 2개.
-- untaken: 가장 약했던 말 대신 다른 말을 했다면 갈라졌을 미래. instead는 "만약 '…'라고 했다면" 형식, events 2개.`;
+- untaken: 가장 약했던 말 대신, 그 순간에 했으면 더 좋았을 **새로운 한 문장**을 네가 지어서 갈라졌을 미래를 쓴다. instead는 "만약 '새 문장'이라고 했다면" 형식이고, 새 문장은 실제로 한 말과 달라야 한다(20자 안팎의 자연스러운 구어체). events 2개도 크게 터지게.`;
 
   const lines = plan.lines
     .map((l) => {
@@ -184,7 +195,7 @@ export function assembleEnding(plan: EndingPlan, text: EndingText, model: string
   };
 }
 
-export const ENDING_PROMPT_VERSION = "galaxy-ending@1";
+export const ENDING_PROMPT_VERSION = "galaxy-ending@2";
 
 const STR = { type: "string" } as const;
 export const ENDING_JSON_SCHEMA = {
@@ -220,6 +231,9 @@ export async function writeEnding(state: GameState): Promise<EndingResult> {
     const text = EndingTextSchema.parse(json);
     // 모든 마디의 연표가 있어야 한다. 빠지면 형식 실패로 보고 다시 시도한다.
     for (const l of plan.lines) if (!text.chains.some((c) => c.turn === l.turn && c.events.length > 0)) throw new Error(`missing_chain_${l.turn}`);
+    // 갈라지지 않은 미래는 실제로 한 말이 아니라 다른 말이어야 한다.
+    const weak = plan.lines.find((l) => l.turn === plan.weakestTurn)?.text.replace(/\s/g, "");
+    if (weak && text.untaken.instead.replace(/\s/g, "").includes(weak.slice(0, 12))) throw new Error("untaken_repeats_actual_line");
     return text;
   };
   const res = await callWithRetry(cfg, { ...prompt, schemaName: "galaxy_ending", schema: ENDING_JSON_SCHEMA }, parse);

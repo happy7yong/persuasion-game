@@ -32,9 +32,15 @@ export type StrategyLabel = (typeof STRATEGY_LABELS)[number];
 
 export type Outcome = "success" | "compromise" | "breakdown" | "giveup";
 
+/** 윤재가 이번 차례를 끝내는 방식. 서버가 정하고 출력이 지켰는지 검사한다. */
+export const NPC_MOVES = ["counter", "ask", "concede", "linger"] as const;
+export type NpcMove = (typeof NPC_MOVES)[number];
+
 export interface TurnRecord {
   player: string;
   npc: { type: "dialogue" | "narration"; content: string }[];
+  /** 윤재가 이 마디를 끝낸 방식 (예전 기록에는 없을 수 있음) */
+  move?: NpcMove;
   suggested: number;
   applied: number;
   labels: StrategyLabel[];
@@ -113,4 +119,33 @@ export function finish(state: GameState, forced: "giveup" | null): GameState {
   const outcome: Outcome =
     forced ?? (state.score <= RULES.successScore ? "success" : state.score <= RULES.compromiseScore ? "compromise" : "breakdown");
   return { ...state, finished: true, outcome };
+}
+
+/** 같은 판, 같은 마디에서는 항상 같은 값이 나오는 0~1 난수 (재시도·따라잡기에도 같은 방식이 나오게). */
+function seeded(id: string, n: number): number {
+  let h = 2166136261;
+  for (const c of `${id}:${n}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return ((h >>> 0) % 10_000) / 10_000;
+}
+
+/**
+ * 윤재가 이번 마디를 끝내는 방식을 정한다.
+ * - 반론이 기본. 질문은 한 판에 최대 2번, 연속 금지, 마지막 마디 금지 (플레이어가 대답만 하는 흐름을 막는다).
+ * - 조건부 수긍은 마음이 충분히 흔들린 구간에서만.
+ */
+export function chooseMove(state: GameState): NpcMove {
+  const n = state.turns.length + 1; // 이번이 몇 번째 마디인지
+  const prev = state.turns.at(-1)?.move;
+  const asks = state.turns.filter((t) => t.move === "ask").length;
+  const canAsk = n < RULES.maxTurns && asks < 2 && prev !== "ask";
+  const b = band(state.score);
+  const r = seeded(state.id, n);
+
+  if (b === "accepting") return r < 0.7 ? "concede" : "linger";
+  if (b === "seeking") return r < 0.5 ? "concede" : r < 0.8 ? "counter" : "linger";
+  // 단호하거나 흔들리는 중
+  if (n === 1) return r < 0.75 ? "counter" : "linger";
+  if (canAsk && r < 0.3) return "ask";
+  if (prev === "linger") return "counter";
+  return r < 0.8 ? "counter" : "linger";
 }

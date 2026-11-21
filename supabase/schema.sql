@@ -25,6 +25,7 @@ create table if not exists turns (
   created_at timestamptz not null default now(),
   player_text text not null,
   npc_beats jsonb not null,
+  npc_move text,                    -- counter | ask | concede | linger (서버가 정한 끝맺음)
   suggested_drop numeric not null,
   applied_drop int not null,
   labels text[] not null,

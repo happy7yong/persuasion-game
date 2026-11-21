@@ -28,7 +28,7 @@ describe("LLM 호출 재시도", () => {
   it("형식이 틀리면 한 번 더 시도하고, 두 시도를 모두 기록한다", async () => {
     let n = 0;
     const fetchImpl = (async () => okBody(n++ === 0 ? "{\"beats\":[]}" : goodNpc)) as typeof fetch;
-    const r = await callWithRetry(cfg, call, parseNpcOutput, fetchImpl);
+    const r = await callWithRetry(cfg, call, (j) => parseNpcOutput(j), fetchImpl);
     expect(r.ok).toBe(true);
     expect(r.attempts).toHaveLength(2);
     expect(r.attempts[0]?.result).toMatch(/^invalid_output/);
@@ -37,7 +37,7 @@ describe("LLM 호출 재시도", () => {
 
   it("두 번 다 실패하면 실패를 돌려주고 대체 대사를 만들지 않는다", async () => {
     const fetchImpl = (async () => new Response("busy", { status: 503 })) as typeof fetch;
-    const r = await callWithRetry(cfg, call, parseNpcOutput, fetchImpl);
+    const r = await callWithRetry(cfg, call, (j) => parseNpcOutput(j), fetchImpl);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.failure.kind).toBe("http");
     expect(r.attempts).toHaveLength(2);
@@ -47,7 +47,7 @@ describe("LLM 호출 재시도", () => {
     const fetchImpl = ((_u: string, init: RequestInit) =>
       new Promise((_r, reject) => init.signal?.addEventListener("abort", () => reject(new Error("aborted"))))) as unknown as typeof fetch;
     const t0 = Date.now();
-    const r = await callWithRetry(cfg, call, parseNpcOutput, fetchImpl);
+    const r = await callWithRetry(cfg, call, (j) => parseNpcOutput(j), fetchImpl);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.failure.kind).toBe("timeout");
     expect(Date.now() - t0).toBeLessThan(500);
@@ -59,14 +59,14 @@ describe("LLM 호출 재시도", () => {
       clock += 990;
       return new Response("x", { status: 500 });
     }) as typeof fetch;
-    const r = await callWithRetry(cfg, call, parseNpcOutput, fetchImpl, () => clock);
+    const r = await callWithRetry(cfg, call, (j) => parseNpcOutput(j), fetchImpl, () => clock);
     expect(r.attempts).toHaveLength(1);
   });
 
   it("기록에 API 키가 남지 않는다", async () => {
     process.env.OPENROUTER_API_KEY = "sk-secret-test";
     const fetchImpl = (async () => okBody(goodNpc)) as typeof fetch;
-    const r = await callWithRetry(cfg, call, parseNpcOutput, fetchImpl);
+    const r = await callWithRetry(cfg, call, (j) => parseNpcOutput(j), fetchImpl);
     expect(JSON.stringify(r.attempts)).not.toContain("sk-secret-test");
     delete process.env.OPENROUTER_API_KEY;
   });
@@ -78,6 +78,7 @@ describe("저장된 기록으로 따라잡기 (멱등)", () => {
     idempotency_key: key,
     player_text: text,
     npc_beats: [{ type: "dialogue", content: "응" }],
+    npc_move: "counter",
     suggested_drop: 10,
     labels: ["emotion"],
   });

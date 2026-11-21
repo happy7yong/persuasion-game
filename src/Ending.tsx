@@ -29,11 +29,11 @@ function CountUp({ to }: { to: number }) {
 
 export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; stats: Stats | null; npcName: string; onRetry: () => void }) {
   const { plan, chains } = data;
-  const steps = 2 + chains.length + 4; // 방송 시작, 되감기, 마디별 폭발, 갈림길, 신문, 결과, 마지막
+  const steps = 1 + chains.length + 4; // 방송 시작, 마디별 폭발, 갈림길, 신문, 결과, 마지막
   const [step, setStep] = useState(reduceMotion() ? steps : 0);
   const [copied, setCopied] = useState("");
   const lastRef = useRef<HTMLDivElement>(null);
-  const chainStart = 2;
+  const chainStart = 1;
   const forkStep = chainStart + chains.length;
 
   useEffect(() => {
@@ -81,17 +81,6 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
         <p className="g-small">방금 당신이 한 말들이 전송된 곳</p>
         <h1 className="g-display">은하연애위원회 본회의장</h1>
       </section>
-
-      {step >= 1 && (
-        <section className="g-rewind">
-          <h2 className="g-h">되감기</h2>
-          <ol>
-            {plan.lines.map((l) => (
-              <li key={l.turn}>“{l.text}”</li>
-            ))}
-          </ol>
-        </section>
-      )}
 
       {chains.map(
         (c, i) =>

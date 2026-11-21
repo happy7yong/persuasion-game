@@ -116,7 +116,6 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .g-small { color: var(--star-dim); margin: 0 0 6px; }
 .g-display { font-family: var(--display); font-weight: 400; font-size: clamp(38px, 11vw, 58px); line-height: 1.1; margin: 0; letter-spacing: -0.01em; }
 .g-h { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0 0 16px; color: var(--yellow); }
-.g-rewind ol { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 17px; }
 .g-chain { border-left: 3px solid var(--pink); padding-left: 16px; }
 .g-quote { font-size: 19px; font-weight: 700; margin: 0 0 4px; }
 .g-drop { color: var(--star-dim); margin: 0 0 14px; }
