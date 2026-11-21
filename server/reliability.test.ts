@@ -118,3 +118,12 @@ describe("토큰 암호화", () => {
     expect(decodeState(token)?.score).toBe(87);
   });
 });
+
+describe("Supabase 컬럼이 아직 없을 때", () => {
+  it("PGRST204 오류에서 빠진 컬럼 이름을 꺼낸다", async () => {
+    const { missingColumn } = await import("./store.js");
+    expect(missingColumn(JSON.stringify({ code: "PGRST204", message: "Could not find the 'noticed' column of 'turns' in the schema cache" }))).toBe("noticed");
+    expect(missingColumn(JSON.stringify({ code: "23505", message: "duplicate key" }))).toBeNull();
+    expect(missingColumn("not json")).toBeNull();
+  });
+});

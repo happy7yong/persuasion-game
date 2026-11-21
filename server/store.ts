@@ -18,9 +18,7 @@ export const storeEnabled = () => cfg() !== null;
 
 const STORE_TIMEOUT_MS = 6_000;
 
-async function rest(path: string, init: { method: string; body?: unknown; prefer?: string }): Promise<Response> {
-  const c = cfg();
-  if (!c) throw new StoreError("store_disabled");
+async function send(c: { url: string; key: string }, path: string, init: { method: string; body?: unknown; prefer?: string }): Promise<Response> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), STORE_TIMEOUT_MS);
   try {
@@ -40,6 +38,41 @@ async function rest(path: string, init: { method: string; body?: unknown; prefer
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** PostgREST "없는 컬럼" 오류(PGRST204)에서 컬럼 이름을 꺼낸다. */
+export function missingColumn(body: string): string | null {
+  try {
+    const j = JSON.parse(body) as { code?: string; message?: string };
+    if (j.code !== "PGRST204") return null;
+    return j.message?.match(/'([^']+)' column/)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const without = (body: unknown, col: string): unknown =>
+  Array.isArray(body) ? body.map((b) => without(b, col)) : body && typeof body === "object" ? Object.fromEntries(Object.entries(body).filter(([k]) => k !== col)) : body;
+
+/**
+ * 쓰기에서 Supabase에 아직 없는 컬럼이 있으면 그 컬럼만 빼고 다시 보낸다.
+ * 새 기능을 배포하고 schema.sql을 늦게 실행해도 게임이 멈추지 않게 하려는 것이다.
+ * 빠진 컬럼의 값만 저장되지 않으며, 로그에 남긴다.
+ */
+async function rest(path: string, init: { method: string; body?: unknown; prefer?: string }): Promise<Response> {
+  const c = cfg();
+  if (!c) throw new StoreError("store_disabled");
+  let body = init.body;
+  for (let i = 0; i < 6; i++) {
+    const res = await send(c, path, { ...init, body });
+    if (body === undefined || res.status !== 400) return res;
+    const text = await res.text();
+    const col = missingColumn(text);
+    if (!col) return new Response(text, { status: res.status, headers: res.headers });
+    console.warn(`[store] Supabase에 '${col}' 컬럼이 없어 빼고 저장했어요. supabase/schema.sql을 다시 실행하세요.`);
+    body = without(body, col);
+  }
+  throw new StoreError("too_many_missing_columns");
 }
 
 async function ok(res: Response): Promise<Response> {
@@ -96,7 +129,7 @@ export async function playFinished(playId: string): Promise<boolean> {
 
 export async function storedBelief(playId: string): Promise<unknown | null> {
   if (!storeEnabled()) return null;
-  const res = await ok(await rest(`plays?select=belief&id=eq.${encodeURIComponent(playId)}`, { method: "GET" }));
+  const res = await ok(await rest(`plays?select=*&id=eq.${encodeURIComponent(playId)}`, { method: "GET" }));
   const rows = (await res.json()) as { belief?: unknown }[];
   return rows[0]?.belief ?? null;
 }
@@ -136,7 +169,7 @@ export interface StoredTurn {
 export async function listTurns(playId: string): Promise<StoredTurn[] | null> {
   if (!storeEnabled()) return null;
   const res = await ok(
-    await rest(`turns?select=idx,idempotency_key,player_text,npc_beats,npc_move,reason,noticed,suggested_drop,labels&play_id=eq.${encodeURIComponent(playId)}&order=idx.asc`, {
+    await rest(`turns?select=*&play_id=eq.${encodeURIComponent(playId)}&order=idx.asc`, {
       method: "GET",
     }),
   );
