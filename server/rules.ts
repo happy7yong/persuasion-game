@@ -48,6 +48,8 @@ export interface TurnRecord {
 export interface GameState {
   v: 1;
   id: string;
+  /** 고른 연인. 예전 토큰에는 없을 수 있으며 그때는 "m" */
+  partner?: "m" | "f";
   startedAt: number;
   heardBefore: boolean;
   score: number;
@@ -57,8 +59,8 @@ export interface GameState {
   outcome: Outcome | null;
 }
 
-export function newGame(id: string, now: number, heardBefore: boolean): GameState {
-  return { v: 1, id, startedAt: now, heardBefore, score: RULES.startScore, charsUsed: 0, turns: [], finished: false, outcome: null };
+export function newGame(id: string, now: number, heardBefore: boolean, partner: "m" | "f" = "m"): GameState {
+  return { v: 1, id, partner, startedAt: now, heardBefore, score: RULES.startScore, charsUsed: 0, turns: [], finished: false, outcome: null };
 }
 
 /** 글자 수. 이모지 등 서로게이트 쌍을 한 글자로 센다. */

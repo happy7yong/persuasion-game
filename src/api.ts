@@ -2,11 +2,18 @@ export type Beat = { type: "narration" | "dialogue"; content: string };
 export type Kakao = { time: string; from: "me" | "npc"; text: string; readAt?: string };
 export type Exchange = { player: string; beats: Beat[] };
 
+/** 대화할 연인. 서버 server/content.ts의 PARTNERS와 같다 */
+export type Partner = "m" | "f";
+export const PARTNER_OPTIONS: { key: Partner; label: string; name: string }[] = [
+  { key: "m", label: "남자친구", name: "윤재" },
+  { key: "f", label: "여자친구", name: "서아" },
+];
+
 export interface StartResponse {
   token: string;
   /** Clarity 녹화와 Supabase 기록을 맞춰 보는 판 ID */
   playId: string;
-  scenario: { title: string; npcName: string; place: string; kakao: Kakao[]; opening: Beat[] };
+  scenario: { title: string; npcName: string; partnerLabel: string; place: string; kakao: Kakao[]; opening: Beat[] };
   rules: { maxTurns: number; charBudget: number; messageMax: number };
 }
 
@@ -81,7 +88,7 @@ export const newKey = (): string =>
     : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16));
 
 export const api = {
-  start: (heardBefore: boolean) => post<StartResponse>("/api/start", { consent: true, heardBefore }),
+  start: (heardBefore: boolean, partner: Partner) => post<StartResponse>("/api/start", { consent: true, heardBefore, partner }),
   turn: (token: string, message: string, key: string) => post<TurnResponse>("/api/turn", { token, message, idempotency_key: key }),
   finish: (token: string, giveup: boolean) => post<{ token: string; ending: Ending; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
   stats: async (): Promise<Stats | null> => {

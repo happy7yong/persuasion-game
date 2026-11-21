@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import type { Ending as EndingData, Outcome, Stats } from "./api";
 import { track } from "./clarity";
 
-const OUTCOME: Record<Outcome, { name: string; note: string }> = {
-  success: { name: "설득 성공", note: "윤재의 마음을 돌렸어요." },
-  compromise: { name: "타협", note: "둘이 함께 정한 약속이 생겼어요." },
-  breakdown: { name: "결렬", note: "윤재는 아직 생각이 그대로예요." },
-  giveup: { name: "포기", note: "대화를 중간에 멈췄어요." },
+// 연인 이름은 모두 받침이 없어 조사가 같다 (server/content.ts PARTNERS)
+const OUTCOME: Record<Outcome, { name: string; note: (npc: string) => string }> = {
+  success: { name: "설득 성공", note: (n) => `${n}의 마음을 돌렸어요.` },
+  compromise: { name: "타협", note: () => "둘이 함께 정한 약속이 생겼어요." },
+  breakdown: { name: "결렬", note: (n) => `${n}는 아직 생각이 그대로예요.` },
+  giveup: { name: "포기", note: () => "대화를 중간에 멈췄어요." },
 };
 const SUCCESS_SHAKE = 60;
 const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -142,7 +143,7 @@ export function Ending({ data, stats, npcName, onRetry }: { data: EndingData; st
             {npcName}의 마음을 <strong><CountUp to={plan.shake} />%</strong> 흔들었어요
           </p>
           <p className="result-note">
-            {OUTCOME[plan.outcome].note}
+            {OUTCOME[plan.outcome].note(npcName)}
             {plan.outcome !== "success" && plan.shake < SUCCESS_SHAKE && ` 설득까지 ${SUCCESS_SHAKE - plan.shake}% 남았어요.`}
           </p>
           {stats && stats.finished > 0 && (

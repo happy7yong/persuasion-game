@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, newKey, type Beat, type Exchange, type StartResponse, type Stats } from "./api";
+import { api, ApiError, newKey, PARTNER_OPTIONS, type Beat, type Exchange, type Partner, type StartResponse, type Stats } from "./api";
 import { Ending } from "./Ending";
 import { tag, tagPlay, track } from "./clarity";
 import { clearGame, loadGame, saveGame, type Msg, type SavedGame } from "./storage";
@@ -47,18 +47,22 @@ export function App() {
 }
 
 function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResponse) => void }) {
+  const [partner, setPartner] = useState<Partner | null>(null);
   const [consent, setConsent] = useState(false);
   const [heard, setHeard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const chosen = PARTNER_OPTIONS.find((o) => o.key === partner);
 
   const start = async () => {
+    if (!partner) return setError("대화할 연인을 골라 주세요.");
     if (!consent) return setError("시작하려면 대화 기록 활용에 동의해 주세요.");
     setBusy(true);
     setError("");
     try {
-      onStart(await api.start(heard));
+      onStart(await api.start(heard, partner));
       track("game_started");
+      tag("partner", partner);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "문제가 생겼어요. 다시 시도해 주세요.");
       setBusy(false);
@@ -71,26 +75,44 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
         <p className="intro-scene">금요일 밤, 동네 카페</p>
         <h1 className="intro-title">우리 얘기 좀 해</h1>
         <p className="intro-lede">
-          오늘 하루 종일 연락이 없던 연인 윤재.
+          오늘 하루 종일 연락이 없던 연인{chosen ? ` ${chosen.name}` : ""}.
           <br />
-          다섯 마디 안에 윤재의 마음을 돌릴 수 있을까요?
+          다섯 마디 안에 마음을 돌릴 수 있을까요?
         </p>
+        <fieldset className="partner">
+          <legend>누구와 이야기할까요?</legend>
+          <div className="partner-options">
+            {PARTNER_OPTIONS.map((o) => (
+              <label key={o.key} className={`partner-option ${partner === o.key ? "on" : ""}`}>
+                <input
+                  type="radio"
+                  name="partner"
+                  value={o.key}
+                  checked={partner === o.key}
+                  onChange={() => (setPartner(o.key), setError(""))}
+                />
+                <span className="partner-label">{o.label}</span>
+                <span className="partner-name">{o.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <div className="intro-count" aria-live="polite">
           {stats && stats.finished > 0 ? (
             <>
               <strong>
                 {stats.finished}명 중 {stats.persuaded}명
               </strong>
-              이 윤재를 설득했어요
+              이 연인을 설득했어요
             </>
           ) : (
-            <>아직 아무도 윤재를 설득하지 못했어요</>
+            <>아직 아무도 연인을 설득하지 못했어요</>
           )}
         </div>
         <ul className="intro-rules">
           <li>말할 기회는 다섯 번, 쓸 수 있는 글자는 모두 600자예요.</li>
           <li>한번 한 말은 고칠 수 없어요.</li>
-          <li>윤재가 얼마나 흔들렸는지는 끝나야 알 수 있어요.</li>
+          <li>마음이 얼마나 흔들렸는지는 끝나야 알 수 있어요.</li>
         </ul>
         <label className="check">
           <input type="checkbox" checked={consent} onChange={(e) => (setConsent(e.target.checked), setError(""))} />

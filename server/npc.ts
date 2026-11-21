@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BAND_GUIDE, COMMON_PRINCIPLES, ENGINE_RULES, MOVE_GUIDE, NPC_CORE, OUTPUT_FORMAT, SCENARIO, SCENE_FACTS, SCORING_RUBRIC } from "./content.js";
+import { BAND_GUIDE, COMMON_PRINCIPLES, coreFor, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, rubricFor, SCENARIO, sceneFactsFor, scenarioFor } from "./content.js";
 import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
 import { modelConfig } from "./model-config.js";
 import { band, chooseMove, STRATEGY_LABELS, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
@@ -59,19 +59,20 @@ export function parseNpcOutput(raw: unknown, move: NpcMove = "counter", strict =
 }
 
 export function buildNpcPrompt(state: GameState, playerText: string, move: NpcMove = chooseMove(state)): { system: string; user: string } {
+  const partner = state.partner ?? "m";
   const system = [
     ENGINE_RULES,
     COMMON_PRINCIPLES,
-    NPC_CORE,
-    `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${SCENE_FACTS.map((f) => `- ${f}`).join("\n")}`,
+    coreFor(partner),
+    `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
-    SCORING_RUBRIC,
+    rubricFor(partner),
     OUTPUT_FORMAT,
     `# 이번 차례를 끝내는 방식\n${MOVE_GUIDE[move]}`,
   ].join("\n\n");
 
   // B(relationship-engine)의 대화 기록 형식: 너/플레이어, 말/행동을 나눠 2인칭으로 준다.
-  const lines: string[] = SCENARIO.opening.map(beatLine);
+  const lines: string[] = scenarioFor(partner).opening.map(beatLine);
   for (const t of state.turns) {
     lines.push(`- 플레이어 (말): ${t.player}`);
     lines.push(...t.npc.map(beatLine));
@@ -161,8 +162,9 @@ export function scriptedReply(state: GameState, text: string): NpcReply {
     linger: "…그렇구나.",
   };
   const beats: NpcReply["beats"] = [{ type: "dialogue", content: said[move] }];
-  if (move === "linger") beats.push({ type: "narration", content: "윤재가 잔을 두 손으로 감싼 채 한참 내려다본다." });
-  else beats.unshift({ type: "narration", content: "윤재가 잔을 두 손으로 감싼다." });
+  const p = state.partner ?? "m";
+  if (move === "linger") beats.push({ type: "narration", content: forPartner("윤재가 잔을 두 손으로 감싼 채 한참 내려다본다.", p) });
+  else beats.unshift({ type: "narration", content: forPartner("윤재가 잔을 두 손으로 감싼다.", p) });
   return {
     beats,
     move,

@@ -1,5 +1,6 @@
 // 엔딩: 경로(갈림길)는 코드가 대화 전체에서 계산하고, LLM은 웃긴 문장만 쓴다.
 import { z } from "zod";
+import { PARTNERS } from "./content.js";
 import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
 import { modelConfig } from "./model-config.js";
 import { shakePercent, type GameState, type Outcome, type StrategyLabel } from "./rules.js";
@@ -46,6 +47,8 @@ export interface Fork {
 }
 
 export interface EndingPlan {
+  /** 연인의 이름 */
+  npcName: string;
   outcome: Outcome;
   shake: number;
   lines: { turn: number; text: string; drop: number; labels: StrategyLabel[] }[];
@@ -102,7 +105,7 @@ export function planEnding(state: GameState): EndingPlan {
       decidingTurn: finalKey === "apology" ? apologyTurn : finalKey === "laugh" ? laughTurn : (lines.at(-1)?.turn ?? null),
     },
   ];
-  return { outcome, shake: shakePercent(state.score), lines, strongestTurn: strongest, weakestTurn: weakest, forks };
+  return { npcName: PARTNERS[state.partner ?? "m"].name, outcome, shake: shakePercent(state.score), lines, strongestTurn: strongest, weakestTurn: weakest, forks };
 }
 
 const EventText = z.string().trim().min(1).max(140);
@@ -129,7 +132,7 @@ export interface Ending {
 const OUTCOME_KO: Record<Outcome, string> = { success: "설득 성공", compromise: "타협", breakdown: "결렬", giveup: "포기" };
 
 export function buildEndingPrompt(plan: EndingPlan): { system: string; user: string } {
-  const system = `너는 '은하 연합 타임스'의 속보 작가다. 한 지구인이 카페에서 연인 윤재와 연락 문제로 나눈 대화가, 사실은 은하연애위원회에 생중계되고 있었다.
+  const system = `너는 '은하 연합 타임스'의 속보 작가다. 한 지구인이 카페에서 연인 ${plan.npcName}와 연락 문제로 나눈 대화가, 사실은 은하연애위원회에 생중계되고 있었다.
 그 지구인의 말 한마디 한마디가 미래를 말도 안 되게 바꿔 놓은 연표를 쓴다.
 
 # 톤
@@ -157,12 +160,12 @@ export function buildEndingPrompt(plan: EndingPlan): { system: string; user: str
   const lines = plan.lines
     .map((l) => {
       const years = (TURN_YEARS[l.turn - 1] ?? TURN_YEARS[4]!).join(", ");
-      return `${l.turn}. "${l.text}" (윤재 마음 -${l.drop}%, 특징: ${l.labels.join(", ") || "없음"}, 연도: ${years})`;
+      return `${l.turn}. "${l.text}" (${plan.npcName} 마음 -${l.drop}%, 특징: ${l.labels.join(", ") || "없음"}, 연도: ${years})`;
     })
     .join("\n");
   const forks = plan.forks.map((f) => `- ${f.era} (${f.basis}): ${f.chosen}`).join("\n");
   const user = `# 대화 결과
-${OUTCOME_KO[plan.outcome]}, 윤재의 마음을 ${plan.shake}% 흔들었다.
+${OUTCOME_KO[plan.outcome]}, ${plan.npcName}의 마음을 ${plan.shake}% 흔들었다.
 
 # 지구인의 말 (순서대로)
 ${lines}

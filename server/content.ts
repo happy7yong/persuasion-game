@@ -1,8 +1,20 @@
 // 시나리오와 NPC. 프롬프트는 relationship-engine(B)의 3층 구조(엔진 규칙 / 공통 원칙 / 인물 Core)를 따른다.
+//
+// 연인은 두 명 중 고른다. 이름과 성별만 다르고 Core·장면·첫 대사는 같다 (연구 비교를 위해 변수는 성별 하나).
+// 아래 원문은 "윤재"로 쓰여 있고, 고른 연인의 이름으로 바꿔 쓴다. 두 이름 모두 받침이 없어 조사(가/는/를/의)가 같다.
+
+export const PARTNERS = {
+  m: { name: "윤재", label: "남자친구", gender: "남자" },
+  f: { name: "서아", label: "여자친구", gender: "여자" },
+} as const;
+export type Partner = keyof typeof PARTNERS;
+export const PARTNER_KEYS = Object.keys(PARTNERS) as Partner[];
+
+/** 원문의 "윤재"를 고른 연인의 이름으로 바꾼다. */
+export const forPartner = (text: string, partner: Partner): string => text.replaceAll("윤재", PARTNERS[partner].name);
 
 export const SCENARIO = {
   title: "우리 얘기 좀 해",
-  npcName: "윤재",
   place: "금요일 밤, 동네 카페",
   kakao: [
     { time: "10:12", from: "me", text: "좋은 아침~ 오늘 회의 많다며 화이팅" },
@@ -63,7 +75,7 @@ Core 성격 → 개인 가치관 → 현재 목표/상황 → 알고 있는 정�
 4. 너에게는 플레이어와 관계없는 일·피곤함·하려던 일·생활이 있다.
 
 ## 독립적 판단과 행동
-1. 판단의 출발점은 너 자신이다. "이 장면에서 어떤 반응이 좋은가"나 플레이어에게 좋은 반응, 관계에 유리한 결과를 먼저 정하지 않는다. "윤재라면 지금 무엇을 할까"를 판단한다.
+1. 판단의 출발점은 너 자신이다. "이 장면에서 어떤 반응이 좋은가"나 플레이어에게 좋은 반응, 관계에 유리한 결과를 먼저 정하지 않는다. "이 사람이라면 지금 가진 정보와 관계 경험으로 무엇을 할 것인가"를 판단한다.
 2. 감정은 실제 행동에 영향을 준다. 서운함·억울함·피곤함·애정은 말투뿐 아니라 무엇을 말하고 말지에 영향을 준다. 부정적 감정을 표현한 뒤 자동으로 가장 배려 깊고 성숙한 말로 보정하지 않는다.
 3. 너는 자기 입장을 유지할 수 있다. 친밀함 때문에 자동으로 동의하거나 사과하지 않는다. 갈등이 오늘 다 풀릴 필요도 없다.
 4. 행동의 결과를 미리 정하지 않는다. 화해 같은 전개를 위해 감정이나 선택을 역산하지 않는다.`;
@@ -169,3 +181,28 @@ export const MOVE_GUIDE: Record<"counter" | "ask" | "concede" | "linger", string
   linger:
     "여운: 짧게 반응하고(대사 1문장 이하) 행동 묘사(narration)로 끝낸다. 질문하지 않는다. 무언가를 생각하는 듯한 침묵이 느껴지게.",
 };
+
+// ------------------------------------------------------------------ 고른 연인에 맞춘 내용
+
+export function scenarioFor(partner: Partner) {
+  return {
+    title: SCENARIO.title,
+    npcName: PARTNERS[partner].name,
+    partnerLabel: PARTNERS[partner].label,
+    place: SCENARIO.place,
+    kakao: SCENARIO.kakao,
+    opening: SCENARIO.opening.map((b) => ({ ...b, content: forPartner(b.content, partner) })),
+  };
+}
+
+export const sceneFactsFor = (partner: Partner) => SCENE_FACTS.map((f) => forPartner(f, partner));
+
+export function coreFor(partner: Partner): string {
+  const p = PARTNERS[partner];
+  return forPartner(NPC_CORE, partner).replace(
+    `# 인물 Core: ${p.name}\n`,
+    `# 인물 Core: ${p.name}\n\n## 기본\n- 20대 후반 ${p.gender} 회사원이다. 플레이어와 1년 넘게 사귄 연인이다.\n`,
+  );
+}
+
+export const rubricFor = (partner: Partner) => forPartner(SCORING_RUBRIC, partner);

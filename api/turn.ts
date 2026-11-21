@@ -4,6 +4,7 @@
 // - 마디는 저장에 성공한 뒤에만 화면에 보낸다. 대체 대사는 만들지 않는다 (D-043).
 import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
+import { PARTNERS } from "../server/content.js";
 import { fail, guarded, IdempotencyKey, parseRequest, send, type Res } from "../server/http.js";
 import { npcReply, NPC_PROMPT_VERSION } from "../server/npc.js";
 import { checkMessage, recordTurn, RULES, type GameState } from "../server/rules.js";
@@ -59,7 +60,7 @@ export default guarded(async (req, res) => {
   waitUntil(saveAttempts(state.id, "npc_turn", idx, NPC_PROMPT_VERSION, result.attempts));
   if (!result.ok) {
     console.warn("[turn] generation_failed", state.id, idx, result.failure.message);
-    return fail(res, "generation_failed", "윤재가 잠깐 말을 고르고 있어요. 같은 말을 다시 보내 주세요.");
+    return fail(res, "generation_failed", `${PARTNERS[state.partner ?? "m"].name}가 잠깐 말을 고르고 있어요. 같은 말을 다시 보내 주세요.`);
   }
 
   const { reply } = result;

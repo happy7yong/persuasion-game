@@ -51,7 +51,7 @@ async function ok(res: Response): Promise<Response> {
 
 export async function createPlay(state: GameState): Promise<void> {
   if (!storeEnabled()) return;
-  await ok(await rest("plays", { method: "POST", prefer: "return=minimal", body: { id: state.id, heard_before: state.heardBefore } }));
+  await ok(await rest("plays", { method: "POST", prefer: "return=minimal", body: { id: state.id, heard_before: state.heardBefore, partner: state.partner ?? "m" } }));
 }
 
 export async function finishPlay(state: GameState, ending: unknown, endingModel: string, endingUsage: LlmUsage | null): Promise<void> {

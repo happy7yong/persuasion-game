@@ -7,6 +7,7 @@ create table if not exists plays (
   id text primary key,
   created_at timestamptz not null default now(),
   heard_before boolean,
+  partner text,                     -- m(윤재, 남자친구) | f(서아, 여자친구)
   finished_at timestamptz,
   outcome text,
   final_score int,
