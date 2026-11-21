@@ -317,8 +317,9 @@ function Chat({ session, update, onRestart }: { session: SavedGame; update: (p: 
     <main className="chat">
       <header className="chat-head">
         <div>
-          <h1 className="chat-name">{scenario.npcName}</h1>
-          <p className="chat-place">{scenario.place}</p>
+          <h1 className="chat-name">{scenario.partnerLabel ?? "연인"} {scenario.npcName}</h1>
+          <p className="chat-place">사귄 지 1년 넘음 · {scenario.place}</p>
+          <p className="chat-place">오늘 낮, 답장이 없었던 일을 두고 마주 앉았어요.</p>
         </div>
         <div className="chat-meter">
           <span className="chat-turn">
