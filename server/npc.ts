@@ -1,0 +1,112 @@
+import { z } from "zod";
+import { BAND_GUIDE, COMMON_PRINCIPLES, ENGINE_RULES, NPC_CORE, OUTPUT_FORMAT, SCENARIO, SCENE_FACTS, SCORING_RUBRIC } from "./content.js";
+import { callJson, extractJson, isScripted, type LlmUsage } from "./llm.js";
+import { band, STRATEGY_LABELS, type GameState, type StrategyLabel } from "./rules.js";
+
+const BeatSchema = z.object({
+  type: z.enum(["narration", "dialogue"]),
+  content: z.string().trim().min(1).max(300),
+});
+
+export const NpcOutputSchema = z.object({
+  beats: z.array(BeatSchema).min(1).max(4),
+  evaluation: z.object({
+    suggested_drop: z.number(),
+    labels: z.array(z.string()).default([]),
+    reason: z.string().default(""),
+  }),
+});
+
+export interface NpcReply {
+  beats: { type: "narration" | "dialogue"; content: string }[];
+  suggested: number;
+  labels: StrategyLabel[];
+  reason: string;
+  model: string;
+  usage: LlmUsage | null;
+}
+
+const isLabel = (s: string): s is StrategyLabel => (STRATEGY_LABELS as readonly string[]).includes(s);
+
+export function parseNpcOutput(raw: unknown): Omit<NpcReply, "model" | "usage"> {
+  const out = NpcOutputSchema.parse(raw);
+  return {
+    beats: out.beats.map((b) => ({ type: b.type, content: b.content.replace(/^["“]|["”]$/g, "") })),
+    suggested: out.evaluation.suggested_drop,
+    labels: [...new Set(out.evaluation.labels.filter(isLabel))],
+    reason: out.evaluation.reason.slice(0, 80),
+  };
+}
+
+export function buildNpcPrompt(state: GameState, playerText: string): { system: string; user: string } {
+  const system = [
+    ENGINE_RULES,
+    COMMON_PRINCIPLES,
+    NPC_CORE,
+    `# 장면\n${SCENARIO.place}\n## 네가 아는 사실\n${SCENE_FACTS.map((f) => `- ${f}`).join("\n")}`,
+    `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
+    SCORING_RUBRIC,
+    OUTPUT_FORMAT,
+  ].join("\n\n");
+
+  const lines: string[] = [];
+  lines.push("[윤재] " + SCENARIO.opening.map(fmtBeat).join(" "));
+  for (const t of state.turns) {
+    lines.push(`[플레이어] ${t.player}`);
+    lines.push("[윤재] " + t.npc.map(fmtBeat).join(" "));
+  }
+  const user = `# 지금까지의 대화\n${lines.join("\n")}\n\n# 플레이어의 이번 말\n${playerText}`;
+  return { system, user };
+}
+
+function fmtBeat(b: { type: string; content: string }) {
+  return b.type === "narration" ? `(${b.content})` : `"${b.content}"`;
+}
+
+export async function npcReply(state: GameState, playerText: string): Promise<NpcReply> {
+  if (isScripted()) return scriptedReply(state, playerText);
+  const prompt = buildNpcPrompt(state, playerText);
+  const model = process.env.NPC_MODEL || "openai/gpt-5.4-mini";
+  let lastError: unknown;
+  // 형식이 깨지면 한 번만 다시 시도한다.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await callJson({ model, ...prompt, maxTokens: 700 });
+      return { ...parseNpcOutput(extractJson(res.text)), model: res.model, usage: res.usage };
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
+/** 키 없이 화면을 확인하는 대본 모드. 점수는 말의 특징으로 대충 정한다. */
+export function scriptedReply(state: GameState, text: string): NpcReply {
+  const labels: StrategyLabel[] = [];
+  if (/미안|잘못/.test(text)) labels.push("apology");
+  if (/서운|속상|불안|궁금|좋아/.test(text)) labels.push("emotion");
+  if (/\?|까\b|어때/.test(text)) labels.push("question");
+  if (/규칙|하자|정하|대신|만약/.test(text)) labels.push("compromise");
+  if (/ㅋ/.test(text)) labels.push("humor");
+  if (/당연|무시|애인 맞|왜 안/.test(text) && labels.length === 0) labels.push("pressure");
+  const suggested = labels.includes("pressure") ? 2 : Math.min(20, 4 + labels.length * 5 + Math.floor(text.length / 40));
+  const n = state.turns.length;
+  const lines = [
+    "아… 그렇게 느꼈구나. 그건 내가 몰랐어.",
+    "음, 그 말은 좀 마음에 남는다. 근데 나 회의 몰린 날은 진짜 폰을 못 보거든.",
+    "…솔직히 좀 흔들리네. 그럼 우리 어떻게 하면 좋을까?",
+    "알았어, 네 말도 맞는 것 같아. 나도 조금 더 신경 써볼게.",
+    "고마워, 이렇게 얘기해줘서.",
+  ];
+  return {
+    beats: [
+      { type: "narration", content: "윤재가 잔을 두 손으로 감싼다." },
+      { type: "dialogue", content: lines[Math.min(n, lines.length - 1)] ?? "" },
+    ],
+    suggested,
+    labels,
+    reason: "대본 모드",
+    model: "scripted",
+    usage: null,
+  };
+}
