@@ -42,7 +42,7 @@ const isLabel = (s: string): s is StrategyLabel => (STRATEGY_LABELS as readonly 
 /** 1차 발화 분석 출력의 strict json_schema. 모든 필드 필수, 추가 필드 금지. */
 const ITEM_SCHEMA = { type: "object", additionalProperties: false, required: ["kind", "issue", "text", "quote"], properties: { kind: { type: "string", enum: [...LEDGER_KINDS] }, issue: { type: "string", enum: [...ISSUE_IDS] }, text: { type: "string" }, quote: { type: "string" } } } as const;
 const RESOLVE_SCHEMA = { type: "object", additionalProperties: false, required: ["id", "status", "quote"], properties: { id: { type: "string" }, status: { type: "string", enum: ["accepted", "rejected", "closed"] }, quote: { type: "string" } } } as const;
-const FACTS_JSON_SCHEMA = {
+export const FACTS_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: ["npcLast", "npcResolved", "acts", "playerNew", "playerResolved", "evaluation"],

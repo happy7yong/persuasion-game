@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "tone": "vite-node scripts/tone-check.ts",
     "play": "vite-node scripts/play.ts",
-    "logs": "vite-node scripts/logs.ts"
+    "logs": "vite-node scripts/logs.ts",
+    "eval": "vite-node scripts/eval.ts"
   },
   "dependencies": {
     "@vercel/functions": "^3.11.3",
