@@ -23,7 +23,7 @@ describe("점수 규칙", () => {
     expect(next.relationship.agreement).toBe("none");
   });
   it("상태 점수는 처음 확정된 관계 변화에만 붙고 반복에는 붙지 않는다", () => {
-    const frame = (s: GameState) => ({ request: "-", reason: "-", acknowledge: "읽음 뒤 공백", retain: "즉답은 어려움", focus: "불안", evaluation: { suggested_drop: 8, labels: ["emotion"] as StrategyLabel[], reason: "테스트 평가", noticed: "테스트", evidence: ["읽고도 아무 말이 없었어"] }, stateUpdate: { mind: s.currentMind, acknowledge: ["읽고 답을 미룬 일은 불안을 만들었음"], retain: [], resolve: [], playerStance: [], propose: [], agreement: "none" as const, evidence: ["읽고도 아무 말이 없었어"], progress: [{ type: "acknowledged" as const, issue: "read-gap" as const }] } });
+    const frame = (s: GameState) => ({ request: "-", reason: "-", acknowledge: "읽음 뒤 공백", retain: "즉답은 어려움", focus: "불안", continuity: { respondsTo: "직전 대화", playerAct: "other" as const, accepted: "없음", notAccepted: "없음", mustAddress: "불안", doNotRepeat: [] }, evaluation: { suggested_drop: 8, labels: ["emotion"] as StrategyLabel[], reason: "테스트 평가", noticed: "테스트", evidence: ["읽고도 아무 말이 없었어"] }, stateUpdate: { mind: s.currentMind, acknowledge: ["읽고 답을 미룬 일은 불안을 만들었음"], retain: [], resolve: [], playerStance: [], propose: [], agreement: "none" as const, evidence: ["읽고도 아무 말이 없었어"], progress: [{ type: "acknowledged" as const, issue: "read-gap" as const }] } });
     let s = newGame("progress", Date.now(), false);
     s = recordTurn(s, { player: "읽고도 아무 말이 없었어", npc: [{ type: "dialogue", content: "미안" }], frame: frame(s), suggested: 8, labels: ["emotion"] });
     expect(s.turns[0]?.applied).toBe(9);
@@ -130,6 +130,7 @@ describe("NPC 출력", () => {
         acknowledge: "오래 기다리게 한 사실",
         retain: "회의 중에는 바로 답하기 어려움",
         focus: "한 번의 연락이 가능한 범위",
+        continuity: { respondsTo: "점심 때 연락이 어렵다는 설명", playerAct: "new_request", accepted: "즉답이 어려울 수 있음", notAccepted: "사전 안내 없는 침묵", mustAddress: "한 번 알리는 방법", doNotRepeat: ["회의가 바빴다는 설명"] },
         evaluation: { suggested_drop: 8, labels: ["logic"], reason: "요구는 구체적이지만 핵심 반론에는 아직 답하지 않음", noticed: "방법을 분명히 말함", evidence: ["바로 답장 말고 한 번만 알려줘"] },
         stateUpdate: {
           mind: { fatigue: 3, guilt: 2, defensiveness: 2, care: 2, openness: 2, focus: "연락 공백이 만든 불안", want: "걱정을 직접 말해주길 바람" },

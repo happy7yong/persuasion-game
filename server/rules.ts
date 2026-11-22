@@ -101,6 +101,15 @@ export interface TurnFrame {
   retain: string;
   /** 이번 대사에서 직접 다룰 하나의 초점 */
   focus: string;
+  /** 직전 대화와 이번 말을 잇는 연결 정보. 대사 모델은 이 항목을 우선해 다음 말을 만든다. */
+  continuity: {
+    respondsTo: string;
+    playerAct: "new_request" | "accepts_limit" | "accepts_proposal" | "resigned" | "asks_clarification" | "repeats_concern" | "other";
+    accepted: string;
+    notAccepted: string;
+    mustAddress: string;
+    doNotRepeat: string[];
+  };
   /** 대사를 쓰기 전에, 플레이어 발화만 놓고 확정한 점수 판단 */
   evaluation: {
     suggested_drop: number;

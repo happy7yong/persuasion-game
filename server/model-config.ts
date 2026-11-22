@@ -27,8 +27,8 @@ export function modelConfig(call: CallType): CallModelConfig {
     return {
       // 상태 판정은 짧은 구조화 작업이므로 비용 효율 모델을 유지한다.
       model: process.env.FRAME_MODEL || process.env.NPC_MODEL || "openai/gpt-5.4-mini",
-      // 상태 변경안까지 함께 반환하므로 기존 관계 해석보다 여유가 필요하다.
-      maxTokens: 500,
+      // 관계 상태·대화 연결·변경안을 함께 반환하므로 출력이 잘리지 않게 여유를 둔다.
+      maxTokens: 800,
       timeoutMs: 8_000,
       budgetMs: 9_000,
       maxAttempts: 1,

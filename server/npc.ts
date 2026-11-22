@@ -36,6 +36,14 @@ const TurnFrameSchema = z.object({
   acknowledge: z.string().trim().min(1).max(180),
   retain: z.string().trim().min(1).max(180),
   focus: z.string().trim().min(1).max(180),
+  continuity: z.object({
+    respondsTo: z.string().trim().min(1).max(180),
+    playerAct: z.enum(["new_request", "accepts_limit", "accepts_proposal", "resigned", "asks_clarification", "repeats_concern", "other"]),
+    accepted: z.string().trim().min(1).max(180),
+    notAccepted: z.string().trim().min(1).max(180),
+    mustAddress: z.string().trim().min(1).max(180),
+    doNotRepeat: z.array(z.string().trim().min(1).max(180)).max(2),
+  }),
   evaluation: z.object({
     suggested_drop: z.number().int().min(0).max(14),
     labels: z.array(z.enum(STRATEGY_LABELS)).max(2),
@@ -58,13 +66,16 @@ export function parseTurnFrame(raw: unknown): TurnFrame {
 const TURN_FRAME_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["request", "reason", "acknowledge", "retain", "focus", "evaluation", "stateUpdate"],
+  required: ["request", "reason", "acknowledge", "retain", "focus", "continuity", "evaluation", "stateUpdate"],
   properties: {
     request: { type: "string" },
     reason: { type: "string" },
     acknowledge: { type: "string" },
     retain: { type: "string" },
     focus: { type: "string" },
+    continuity: { type: "object", additionalProperties: false, required: ["respondsTo", "playerAct", "accepted", "notAccepted", "mustAddress", "doNotRepeat"], properties: {
+      respondsTo: { type: "string" }, playerAct: { type: "string", enum: ["new_request", "accepts_limit", "accepts_proposal", "resigned", "asks_clarification", "repeats_concern", "other"] }, accepted: { type: "string" }, notAccepted: { type: "string" }, mustAddress: { type: "string" }, doNotRepeat: { type: "array", maxItems: 2, items: { type: "string" } },
+    } },
     evaluation: { type: "object", additionalProperties: false, required: ["suggested_drop", "labels", "reason", "noticed", "evidence"], properties: {
       suggested_drop: { type: "integer", minimum: 0, maximum: 14 }, labels: { type: "array", maxItems: 2, items: { type: "string", enum: [...STRATEGY_LABELS] } }, reason: { type: "string" }, noticed: { type: "string" }, evidence: { type: "array", maxItems: 2, items: { type: "string" } },
     } },
@@ -167,9 +178,10 @@ export function buildNpcPrompt(
     `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
     `# 이번 세션의 현재 마음과 관계 상태\n${sessionStateText(state)}\n이 상태는 이 판에서만 이어지는 실제 판단의 재료다. Core를 덮어쓰지 않는다. 이미 인정한 사실을 처음 깨달은 것처럼 반복하지 말고, 아직 유지하는 입장과 미해결 쟁점을 이어서 다룬다.`,
+    `# 최근 대화 기억\n${conversationMemory(state)}`,
     "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.",
     frame
-      ? `# 이번 턴 관계 해석 (대사 전에 확정됨)\n- 플레이어의 요청: ${frame.request}\n- 플레이어가 밝힌 이유·감정: ${frame.reason}\n- 네가 인정할 수 있는 사실: ${frame.acknowledge}\n- 네가 아직 유지하는 입장: ${frame.retain}\n- 이번 대사의 초점: ${frame.focus}\n이 해석의 행위자·횟수·시간 범위를 바꾸지 않는다. 대사는 이 초점 하나에 반응하고, 해석에 없는 약속·사실·요구를 만들지 않는다.`
+      ? `# 이번 턴 관계 해석 (대사 전에 확정됨)\n- 플레이어의 요청: ${frame.request}\n- 플레이어가 밝힌 이유·감정: ${frame.reason}\n- 네가 인정할 수 있는 사실: ${frame.acknowledge}\n- 네가 아직 유지하는 입장: ${frame.retain}\n- 이번 대사의 초점: ${frame.focus}\n\n# 이번 턴 대화 연결 (최우선)\n- 이번 말이 이어받는 직전 내용: ${frame.continuity.respondsTo}\n- 플레이어의 이번 행위: ${frame.continuity.playerAct}\n- 플레이어가 받아들인 범위: ${frame.continuity.accepted}\n- 플레이어가 아직 받아들이지 않은 범위: ${frame.continuity.notAccepted}\n- 이번 대사에서 반드시 이어 줄 연결: ${frame.continuity.mustAddress}\n- 이번 턴에 되풀이하지 않을 내용: ${frame.continuity.doNotRepeat.join(" / ") || "없음"}\n대사는 이 연결을 먼저 이어야 한다. 특히 플레이어가 기다리겠다고 해도, 직전 약속에서 NPC가 맡은 행동까지 포기한 뜻으로 바꾸지 않는다. 해석에 없는 약속·사실·요구를 만들지 않는다.`
       : null,
     OUTPUT_FORMAT,
     move === null && finalTurn
@@ -203,6 +215,21 @@ function conversationLines(state: GameState): string[] {
   return lines;
 }
 
+/** 최근 원문과 각 턴에서 확정된 약속·수용을 같이 넘겨, 다음 대사가 맥락을 잇게 한다. */
+function conversationMemory(state: GameState): string {
+  if (state.turns.length === 0) return "아직 플레이어와 주고받은 말 없음";
+  return state.turns.slice(-3).map((turn, i, turns) => {
+    const n = state.turns.length - turns.length + i + 1;
+    const link = turn.frame?.continuity;
+    const updates = turn.frame?.stateUpdate;
+    const added = [
+      ...(updates?.propose ?? []).map((x) => `검토 방법: ${x}`),
+      ...(updates?.playerStance ?? []).map((x) => `플레이어 입장: ${x}`),
+    ].join(" / ") || "새 약속·수용 없음";
+    return `- ${n}턴: 플레이어 “${turn.player}” → NPC “${turn.npc.filter((b) => b.type === "dialogue").map((b) => b.content).join(" / ")}”\n  연결: ${link ? `${link.playerAct}; ${link.mustAddress}` : "기존 기록"}\n  ${added}`;
+  }).join("\n");
+}
+
 function sessionStateText(state: GameState): string {
   const mind = state.currentMind;
   const list = (xs: { text: string; status: string }[]) => xs.filter((x) => x.status === "held").map((x) => x.text).join(" / ") || "없음";
@@ -229,6 +256,7 @@ export function buildTurnFramePrompt(state: GameState, playerText: string): { sy
 - acknowledge에는 반드시 "NPC가 한 행동 → 플레이어에게 생긴 결과" 형태로, NPC가 이번 말에서 인정할 수 있는 구체적 사실 하나를 쓴다. 플레이어 감정만 단독으로 쓰지 않는다. 없으면 "바로 인정할 사실 없음"이라고 쓴다.
 - retain에는 NPC가 아직 유지하는 입장·걱정 하나를 쓴다. 없으면 "남은 핵심 걱정 없음"이라고 쓴다.
 - focus에는 이번 대사가 직접 답할 한 가지를 쓴다. 대사·사과·해결책은 쓰지 않는다.
+- continuity는 이전 대화에서 이번 말로 이어지는 연결을 확정한다. respondsTo에는 이번 플레이어 말이 답하는 직전 약속·설명·질문을 적는다. playerAct는 이번 말의 기능을 고른다. accepted와 notAccepted를 분리한다. 예를 들어 플레이어가 "기다릴게"라고 해도, 직전 NPC가 늦을 때 먼저 알리겠다고 했다면 즉답이 어렵다는 한계만 받아들인 것이며 NPC의 사전 안내 책임까지 포기한 것은 아니다. mustAddress에는 그 차이를 포함해 이번 대사가 반드시 이어 줄 연결 하나를 적는다. doNotRepeat에는 직전 대사에서 이미 설명해 이번 턴에 다시 방어하면 안 되는 주장만 넣는다.
 - stateUpdate는 이번 판단 뒤의 다음 상태 **제안**이다. mind 수치는 이전 상태에서 한 단계(±1)까지만 바꾼다. playerStance에는 플레이어가 이번 또는 이전 대화에서 실제로 말한 태도만 넣는다. propose는 아직 검토 중인 방법이며, mutual은 마지막 턴에 양쪽이 실제로 행동을 말했을 때만 쓴다. evidence에는 실제 문장을 짧게 적는다. progress는 이번 플레이어 말로 **처음 생긴** 관계 변화만 최대 3개 고른다: acknowledged(윤재가 결과를 인정), player_accepts_limit(플레이어가 윤재가 유지한 현실적 한계를 명시적으로 받아들이고, 그 한계 자체를 더는 잘못으로 다루지 않음), player_changes_approach(플레이어가 자기 접근을 바꿈), proposal_created(방법 검토 시작), issue_resolved(마지막에 쟁점 해결), mutual_agreement(마지막 상호 합의). 플레이어가 겪은 결과를 말하거나 감정을 드러내거나 윤재의 행동을 비판하는 것은, 윤재의 한계를 수용한 것이 아니다. issue에는 read-gap / intent-trust / availability / repair-method 중 하나를 쓰고, mutual_agreement만 issue에 none을 쓴다. 같은 변화의 반복에는 넣지 않는다.
 - 장면이나 대화에 없는 사건·약속·시점·규칙을 만들지 않는다.
 
@@ -240,6 +268,9 @@ ${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}
 
 # 이번 세션의 현재 상태
 ${sessionStateText(state)}
+
+# 최근 대화 기억
+${conversationMemory(state)}
 
 # 플레이어 발화 평가 기준
 ${rubricFor(partner)}
@@ -253,7 +284,7 @@ ${conversationLines(state).join("\n")}
 - 플레이어 (말): ${playerText}
 
 # 이번 작업
-JSON으로 이번 턴 관계 해석과 플레이어 발화 평가만 답한다. 대사·사과·행동은 절대 쓰지 않는다.`;
+JSON으로 이번 턴 관계 해석, 대화 연결, 플레이어 발화 평가만 답한다. 대사·사과·행동은 절대 쓰지 않는다.`;
   return { system, user };
 }
 
@@ -262,7 +293,7 @@ function beatLine(b: { type: string; content: string }) {
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "turn-state@2";
+export const NPC_PROMPT_VERSION = "turn-state@3";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
@@ -376,6 +407,7 @@ export function scriptedReply(state: GameState, text: string): NpcReply {
       acknowledge: "대본 모드라 세부 해석 없음",
       retain: "대본 모드라 세부 해석 없음",
       focus: "대본 모드 응답",
+      continuity: { respondsTo: "대본 모드라 연결 없음", playerAct: "other", accepted: "없음", notAccepted: "없음", mustAddress: "대본 모드 응답", doNotRepeat: [] },
       evaluation: { suggested_drop: suggested, labels, reason: "대본 모드의 간이 평가", noticed: labels.includes("compromise") ? "방법부터 꺼내는 편" : labels.includes("emotion") ? "서운한 걸 바로 말하는 편" : "아직 잘 모르겠음", evidence: [] },
       stateUpdate: { mind: state.currentMind, acknowledge: [], retain: [], resolve: [], playerStance: [], propose: [], agreement: state.relationship.agreement, evidence: [], progress: [] },
     },
