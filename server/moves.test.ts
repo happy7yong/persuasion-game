@@ -81,9 +81,12 @@ describe("끝맺음 검사", () => {
   it("질문은 ask일 때만 허용", () => {
     expect(moveViolation("ask", [d("제일 서운했던 게 뭐였어?")])).toBeNull();
   });
-  it("여운은 행동 묘사로 끝난다", () => {
+  it("여운은 대사·행동 순서를 강제하지 않고, 질문과 긴 대사만 막는다", () => {
+    // 여운은 대사·행동의 순서를 강제하지 않는다 (2026-11-22): 행동으로 끝나도, 대사로 끝나도, 대사만 있어도 된다
     expect(moveViolation("linger", [d("…그렇구나."), n("윤재가 잔을 내려다본다.")])).toBeNull();
-    expect(moveViolation("linger", [d("…그렇구나.")])).toBe("linger_not_narration");
+    expect(moveViolation("linger", [n("윤재가 잔을 내려다본다."), d("…그렇구나.")])).toBeNull();
+    expect(moveViolation("linger", [d("…그렇구나.")])).toBeNull();
+    expect(moveViolation("linger", [d("…그렇구나?")])).toBe("question_in_linger");
     expect(moveViolation("linger", [d("…응."), d("그래."), n("윤재가 잔을 내려다본다.")])).toBe("linger_too_many_dialogues");
   });
   it("엄격 모드에서만 거부하고, 마지막 시도는 형식만 본다", () => {

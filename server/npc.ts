@@ -74,7 +74,7 @@ export function parseFacts(state: GameState, playerText: string, raw: unknown, s
 
 const ENDS_WITH_QUESTION = /[?？]\s*[)"”’…~.]*\s*$/u;
 
-/** 끝맺음 방식을 지켰는지. 질문은 ask일 때만, 여운은 행동 묘사로 끝난다. 위반 사유 또는 null. */
+/** 끝맺음 방식을 지켰는지. 질문은 ask일 때만, 대사 개수 상한. 여운의 대사·행동 순서는 강제하지 않는다. 위반 사유 또는 null. */
 export function moveViolation(move: NpcMove, beats: { type: string; content: string }[]): string | null {
   const last = beats.at(-1);
   if (!last) return "no_beats";
@@ -83,7 +83,6 @@ export function moveViolation(move: NpcMove, beats: { type: string; content: str
   if (move !== "ask" && asks) return `question_in_${move}`;
   if (move === "counter" && dialogueCount > 2) return "counter_too_many_dialogues";
   if (move === "linger" && dialogueCount > 1) return "linger_too_many_dialogues";
-  if (move === "linger" && last.type !== "narration") return "linger_not_narration";
   return null;
 }
 
@@ -317,7 +316,6 @@ function retryNote(lastError: string): string {
   if (lastError.includes("reply_repeats_previous")) notes.push("직전 네 대사를 되풀이했다. 같은 내용을 다시 말하지 않는다.");
   const mv = lastError.match(/move_violation:(\w+)/);
   const MOVE_NOTE: Record<string, string> = {
-    linger_not_narration: "여운(linger)은 마지막 beat가 행동 묘사(narration)여야 한다. 대사를 먼저 쓰고 행동 묘사로 끝낸다.",
     linger_too_many_dialogues: "여운(linger)에서는 대사를 1개 이하로 쓴다.",
     counter_too_many_dialogues: "반론(counter)에서는 대사를 2개 이하로 쓴다.",
   };
