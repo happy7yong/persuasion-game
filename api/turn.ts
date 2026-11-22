@@ -60,6 +60,7 @@ export default guarded(async (req, res) => {
   waitUntil(Promise.all([
     saveAttempts(state.id, "turn_frame", idx, NPC_PROMPT_VERSION, result.factsAttempts),
     saveAttempts(state.id, "npc_turn", idx, NPC_PROMPT_VERSION, result.attempts),
+    saveAttempts(state.id, "scene_check", idx, NPC_PROMPT_VERSION, result.sceneAttempts),
   ]));
   if (!result.ok) {
     console.warn("[turn] generation_failed", state.id, idx, result.failure.message);
@@ -90,6 +91,7 @@ export default guarded(async (req, res) => {
       suggested_drop: turn.suggested,
       labels: turn.labels,
       state_frame: reply.facts,
+      checks: { outcome: reply.outcome, attempts: reply.checks },
       applied_drop: turn.applied,
       score_after: turn.scoreAfter,
       model: reply.model,

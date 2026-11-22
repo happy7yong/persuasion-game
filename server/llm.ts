@@ -143,8 +143,10 @@ export async function attemptOnce(
  */
 export async function callWithRetry<T>(
   cfg: CallModelConfig,
-  call: JsonCall,
-  parse: (json: unknown, attempt: { index: number; last: boolean }) => T,
+  /** 시도마다 같은 요청이면 객체, 직전 실패 이유를 붙여 다시 보내려면 함수 */
+  call: JsonCall | ((attempt: { index: number; lastError: string | null }) => JsonCall),
+  /** 출력 검사. 비동기 검사(작은 판정 호출 등)도 된다. throw하면 invalid_output으로 다시 시도 */
+  parse: (json: unknown, attempt: { index: number; last: boolean }) => T | Promise<T>,
   fetchImpl: FetchLike = fetch,
   now: () => number = Date.now,
 ): Promise<{ ok: true; value: T; attempts: AttemptRecord[] } | { ok: false; failure: LlmFailure; attempts: AttemptRecord[] }> {
@@ -156,10 +158,11 @@ export async function callWithRetry<T>(
     // 다음 시도를 할 시간이 남는지로 "마지막 시도"를 판단한다. 마지막 시도에는 parse가 덜 엄격할 수 있다.
     const last = i === cfg.maxAttempts || now() - started + 2 * cfg.timeoutMs > cfg.budgetMs;
     try {
-      const { text, record } = await attemptOnce(cfg, call, i, fetchImpl);
+      const req = typeof call === "function" ? call({ index: i, lastError: i > 1 ? failure.message : null }) : call;
+      const { text, record } = await attemptOnce(cfg, req, i, fetchImpl);
       attempts.push(record);
       try {
-        return { ok: true, value: parse(extractJson(text), { index: i, last }), attempts };
+        return { ok: true, value: await parse(extractJson(text), { index: i, last }), attempts };
       } catch (e) {
         failure = new LlmFailure("invalid_output", e instanceof Error ? e.message.slice(0, 200) : "parse");
         record.result = failure.message;

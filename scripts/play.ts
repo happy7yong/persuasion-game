@@ -103,6 +103,11 @@ while (!state.finished) {
   state = recordTurn(state, { player: check.text, npc: r.reply.beats, move: r.reply.move, facts: r.reply.facts, thought: r.reply.reason, noticed: r.reply.noticed, suggested: r.reply.suggested, labels: r.reply.labels });
   const t = state.turns.at(-1)!;
   show(r.reply.beats, name);
+  if (r.reply.outcome !== "clean" || r.reply.checks.some((x) => x.sceneTriggers.length)) {
+    for (const ck of r.reply.checks)
+      console.log(c.dim(`  검증 ${ck.attempt}차${ck.last ? "(마지막)" : ""}: ${ck.violations.join(" | ") || "통과"}${ck.sceneTriggers.length ? ` · 장면 거름망 ${ck.sceneTriggers.join(",")} → ${ck.sceneVerdict?.verdict ?? "-"}` : ""}`));
+    console.log(c.dim(`  검증 결과: ${r.reply.outcome}`));
+  }
   console.log(
     c.dim(`  [${t.move}] +${t.applied}%${t.applied !== t.suggested ? ` (제안 ${t.suggested})` : ""} → 누적 ${shakePercent(state.score)}% · ${t.labels.join(", ") || "라벨 없음"}`),
   );

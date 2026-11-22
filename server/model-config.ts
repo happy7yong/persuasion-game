@@ -4,7 +4,7 @@
 // 시간 예산: Vercel 함수 상한(vercel.json maxDuration 60초) 안에서 "시도 2회 + 저장"이 끝나야 한다.
 // 두 번째 시도는 남은 예산이 timeoutMs 이상일 때만 시작한다 (withRetry).
 
-export type CallType = "turn_frame" | "npc_turn" | "belief" | "headline";
+export type CallType = "turn_frame" | "npc_turn" | "scene_check" | "belief" | "headline";
 
 export interface CallModelConfig {
   readonly model: string;
@@ -33,6 +33,18 @@ export function modelConfig(call: CallType): CallModelConfig {
       budgetMs: 9_000,
       maxAttempts: 1,
       temperature: 0.2,
+      reasoningNone: true,
+    };
+  }
+  // V3 장면 판정: 키워드에 걸린 대사만, 한 번, 짧게. 실패하면 "애매"로 기록하고 넘어간다.
+  if (call === "scene_check") {
+    return {
+      model: process.env.NPC_MODEL || "openai/gpt-5.4-mini",
+      maxTokens: 120,
+      timeoutMs: 6_000,
+      budgetMs: 6_000,
+      maxAttempts: 1,
+      temperature: 0,
       reasoningNone: true,
     };
   }

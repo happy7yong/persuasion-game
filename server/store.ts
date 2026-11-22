@@ -180,6 +180,8 @@ export interface StoredTurn {
   labels: StrategyLabel[];
   /** 이번 마디의 확정된 사실 (TurnFacts). 장부 도입 전 기록은 예전 관계 해석 형태라 다시 적용하지 않는다 */
   state_frame?: unknown;
+  /** 대사 검증 결과: { outcome: clean | prevented | exposed, attempts: 시도별 위반 } */
+  checks?: unknown;
 }
 
 /** 이 판에 저장된 마디들 (idx 순). 저장소가 꺼져 있으면 null. */
@@ -207,7 +209,7 @@ export async function insertTurn(
 
 // ------------------------------------------------------------------ trace (부가 기록)
 
-export async function saveAttempts(playId: string, callType: "turn_frame" | "npc_turn" | "belief" | "headline", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
+export async function saveAttempts(playId: string, callType: "turn_frame" | "npc_turn" | "scene_check" | "belief" | "headline", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
   if (!storeEnabled() || attempts.length === 0) return;
   try {
     const res = await rest("llm_calls", {

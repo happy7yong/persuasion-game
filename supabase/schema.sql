@@ -48,7 +48,7 @@ create table if not exists turns (
 create table if not exists llm_calls (
   id bigint generated always as identity primary key,
   play_id text not null references plays(id) on delete cascade,
-  call_type text not null,          -- npc_turn | belief | headline
+  call_type text not null,          -- turn_frame | npc_turn | scene_check | belief | headline
   turn_idx int,                     -- ending이면 null
   attempt int not null,             -- 1, 2 (자동 재시도)
   prompt_version text,
@@ -100,6 +100,7 @@ alter table turns add column if not exists usage jsonb;
 alter table turns add column if not exists elapsed_ms int;
 alter table turns add column if not exists prompt_version text;
 alter table turns add column if not exists state_frame jsonb;
+alter table turns add column if not exists checks jsonb;
 
 create unique index if not exists turns_play_idx_unique on turns(play_id, idx);
 
