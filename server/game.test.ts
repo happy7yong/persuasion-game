@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildReport } from "./report.js";
-import { buildNpcPrompt, buildTurnFramePrompt, parseNpcOutput, parseTurnFrame, scriptedReply } from "./npc.js";
-import { applyDrop, applyStateUpdate, checkMessage, finish, newGame, recordTurn, RULES, type GameState, type StrategyLabel } from "./rules.js";
+import { buildFactsPrompt, buildNpcPrompt, parseFacts, parseNpcOutput, scriptedReply } from "./npc.js";
+import { applyDrop, checkMessage, finish, newGame, recordTurn, RULES, type GameState, type StrategyLabel, type TurnFacts } from "./rules.js";
 import { decodeState, encodeState } from "./token.js";
 
 const play = (drops: [string, number, StrategyLabel[]][]): GameState => {
@@ -11,24 +11,16 @@ const play = (drops: [string, number, StrategyLabel[]][]): GameState => {
 };
 
 describe("점수 규칙", () => {
-  it("세션 현재 마음은 한 턴에 한 단계만 바뀌고 관계 상태는 근거와 함께 쌓인다", () => {
-    const s = newGame("mind", Date.now(), false);
-    const next = applyStateUpdate(s, {
-      mind: { fatigue: 0, guilt: 3, defensiveness: 0, care: 3, openness: 3, focus: "읽음 뒤 공백", want: "걱정을 직접 말해주길 바람" },
-      acknowledge: ["읽고 답을 미룬 일은 불안을 만들었음"], retain: [], resolve: [], playerStance: ["무시라고 단정하지 않겠음"], propose: ["나중에 이유를 먼저 말하기"], agreement: "mutual", evidence: ["나는 무시라고 단정하지 않을게"], progress: [],
-    });
-    expect(next.currentMind.guilt).toBe(2);
-    expect(next.currentMind.defensiveness).toBe(2);
-    expect(next.relationship.acknowledged[0]?.sourceTurn).toBe(1);
-    expect(next.relationship.agreement).toBe("none");
-  });
   it("상태 점수는 처음 확정된 관계 변화에만 붙고 반복에는 붙지 않는다", () => {
-    const frame = (s: GameState) => ({ request: "-", reason: "-", acknowledge: "읽음 뒤 공백", retain: "즉답은 어려움", focus: "불안", continuity: { respondsTo: "직전 대화", playerAct: "other" as const, accepted: "없음", notAccepted: "없음", mustAddress: "불안", doNotRepeat: [] }, evaluation: { suggested_drop: 8, labels: ["emotion"] as StrategyLabel[], reason: "테스트 평가", noticed: "테스트", evidence: ["읽고도 아무 말이 없었어"] }, stateUpdate: { mind: s.currentMind, acknowledge: ["읽고 답을 미룬 일은 불안을 만들었음"], retain: [], resolve: [], playerStance: [], propose: [], agreement: "none" as const, evidence: ["읽고도 아무 말이 없었어"], progress: [{ type: "acknowledged" as const, issue: "read-gap" as const }] } });
+    // 플레이어가 연인의 한계(L1)를 받아들이는 말: 점수 이벤트 + 방어심 하락
+    const facts = (resolved: TurnFacts["resolved"]): TurnFacts => ({ v: 2, added: [], resolved, acts: [{ act: "accept", quote: "바로 못 볼 수 있지", refersTo: "L1" }], evaluation: { suggested_drop: 8, labels: ["empathy"], reason: "테스트", noticed: "테스트", evidence: [] } });
     let s = newGame("progress", Date.now(), false);
-    s = recordTurn(s, { player: "읽고도 아무 말이 없었어", npc: [{ type: "dialogue", content: "미안" }], frame: frame(s), suggested: 8, labels: ["emotion"] });
-    expect(s.turns[0]?.applied).toBe(9);
-    s = recordTurn(s, { player: "또 읽고도 아무 말이 없었어", npc: [{ type: "dialogue", content: "응" }], frame: frame(s), suggested: 20, labels: ["emotion"] });
-    expect(s.turns[1]?.applied).toBe(14);
+    s = recordTurn(s, { player: "일할 땐 바로 못 볼 수 있지", npc: [{ type: "dialogue", content: "응" }], facts: facts([{ id: "L1", by: "player", status: "accepted", quote: "바로 못 볼 수 있지" }]), suggested: 8, labels: ["empathy"] });
+    expect(s.turns[0]?.scoreBreakdown).toMatchObject({ base: 8, eventBonus: 2, mindBonus: 1, applied: 11 });
+    expect(s.ledger.find((x) => x.id === "L1")?.status).toBe("accepted");
+    // 같은 항목은 이미 정리돼 다시 받아들일 수 없고, 같은 이벤트에 보너스도 다시 붙지 않는다
+    s = recordTurn(s, { player: "응 바로 못 볼 수 있지", npc: [{ type: "dialogue", content: "응" }], facts: facts([]), suggested: 8, labels: ["empathy"] });
+    expect(s.turns[1]?.scoreBreakdown).toMatchObject({ eventBonus: 0, applied: 8 });
   });
   it("제안값을 0~최대치로 자른다", () => {
     expect(applyDrop(50, ["emotion"])).toBe(RULES.maxDropPerTurn);
@@ -117,27 +109,32 @@ describe("NPC 출력", () => {
     expect(p.user).toContain("- 플레이어 (말): 안식처야");
     expect(p.system).toContain("하지 말 것");
   });
-  it("대사 전 관계 해석은 요구·이유·인정·유지 입장을 분리한다", () => {
+  it("1차 발화 분석은 대사를 쓰지 않고, Core 없이 장부와 원문만 본다", () => {
     const s = play([["점심 때 연락하는 게 어려워?", 3, ["pressure"]]]);
-    const p = buildTurnFramePrompt(s, "바로 답장 말고 한 번만 알려줘");
-    expect(p.system).toContain("대사를 쓰지 않는 관계 대화 해석기");
-    expect(p.system).toContain('"NPC가 한 행동 → 플레이어에게 생긴 결과" 형태');
+    const p = buildFactsPrompt(s, "바로 답장 말고 한 번만 알려줘");
+    expect(p.system).toContain("대화의 기록원");
+    expect(p.system).toContain("L1 [NPC · 한계");
+    expect(p.system).not.toContain("인물 Core");
+    expect(p.system).not.toContain("최근 대화 기억");
     expect(p.user).toContain("바로 답장 말고 한 번만 알려줘");
-    expect(
-      parseTurnFrame({
-        request: "시간 될 때 한 번 짧게 연락하기",
-        reason: "답이 없으면 걱정됨",
-        acknowledge: "오래 기다리게 한 사실",
-        retain: "회의 중에는 바로 답하기 어려움",
-        focus: "한 번의 연락이 가능한 범위",
-        continuity: { respondsTo: "점심 때 연락이 어렵다는 설명", playerAct: "new_request", accepted: "즉답이 어려울 수 있음", notAccepted: "사전 안내 없는 침묵", mustAddress: "한 번 알리는 방법", doNotRepeat: ["회의가 바빴다는 설명"] },
-        evaluation: { suggested_drop: 8, labels: ["logic"], reason: "요구는 구체적이지만 핵심 반론에는 아직 답하지 않음", noticed: "방법을 분명히 말함", evidence: ["바로 답장 말고 한 번만 알려줘"] },
-        stateUpdate: {
-          mind: { fatigue: 3, guilt: 2, defensiveness: 2, care: 2, openness: 2, focus: "연락 공백이 만든 불안", want: "걱정을 직접 말해주길 바람" },
-          acknowledge: ["읽고 답을 미룬 일은 불안을 만들었음"], retain: ["회의 중 바로 답하기 어려움"], resolve: [], playerStance: [], propose: [], agreement: "discussing", evidence: ["바로 답장 말고 한 번만 알려줘"], progress: [],
-        },
-      }),
-    ).toMatchObject({ request: "시간 될 때 한 번 짧게 연락하기" });
+    const facts = parseFacts(s, "바로 답장 말고 한 번만 알려줘", {
+      npcLast: [], npcResolved: [],
+      acts: [{ act: "request", quote: "한 번만 알려줘", refersTo: "L1" }],
+      playerNew: [{ kind: "request", issue: "availability", text: "바쁠 때 한 번만 알려 주기", quote: "한 번만 알려줘" }],
+      playerResolved: [],
+      evaluation: { suggested_drop: 8, labels: ["logic", "nope"], reason: "구체적 요구", noticed: "방법을 분명히 말함", evidence: [] },
+    }, true);
+    expect(facts.added[0]).toMatchObject({ id: "L4", by: "player", kind: "request", turn: 2 });
+    expect(facts.evaluation.labels).toEqual(["logic"]);
+  });
+  it("대사 프롬프트에는 장부와 확인된 사실이 들어가고, 무엇을 말하라는 지시 블록은 없다", () => {
+    const s = newGame("np", Date.now(), false);
+    const facts: TurnFacts = { v: 2, added: [], resolved: [{ id: "L1", by: "player", status: "accepted", quote: "기다릴게" }], acts: [{ act: "accept", quote: "기다릴게", refersTo: "L1" }], evaluation: { suggested_drop: 6, labels: ["empathy"], reason: "-", noticed: "-", evidence: [] } };
+    const p = buildNpcPrompt(s, "알았어 기다릴게", null, facts);
+    expect(p.system).toContain("# 대화 장부");
+    expect(p.system).toContain("L1 [너 · 한계 · availability · 받아들여짐");
+    expect(p.system).toContain("# 방금 플레이어의 말에서 확인된 것");
+    for (const gone of ["대화 연결 (최우선)", "관계 해석 (대사 전에 확정됨)", "최근 대화 기억", "대사 반영:", "지금 신경 쓰는 것"]) expect(p.system).not.toContain(gone);
   });
   it("대본 모드도 형식을 지킨다", () => {
     const r = scriptedReply(newGame("t", Date.now(), false), "미안해 내가 서운해서 그랬어");

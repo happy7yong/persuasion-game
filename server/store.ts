@@ -4,7 +4,7 @@
 // - 멱등: (play_id, idx) 고유 제약 + 요청마다 idempotency_key. 같은 키의 재전송은 처음 결과를 돌려준다.
 // Supabase가 설정되지 않으면 저장 없이 동작한다 (로컬·대본 모드). 이때는 멱등 보장이 없다.
 import type { AttemptRecord, LlmUsage } from "./llm.js";
-import type { GameState, NpcMove, StrategyLabel, TurnFrame } from "./rules.js";
+import type { GameState, NpcMove, StrategyLabel } from "./rules.js";
 
 export class StoreError extends Error {}
 
@@ -178,7 +178,8 @@ export interface StoredTurn {
   noticed?: string | null;
   suggested_drop: number;
   labels: StrategyLabel[];
-  state_frame?: TurnFrame | null;
+  /** 이번 마디의 확정된 사실 (TurnFacts). 장부 도입 전 기록은 예전 관계 해석 형태라 다시 적용하지 않는다 */
+  state_frame?: unknown;
 }
 
 /** 이 판에 저장된 마디들 (idx 순). 저장소가 꺼져 있으면 null. */
@@ -206,7 +207,7 @@ export async function insertTurn(
 
 // ------------------------------------------------------------------ trace (부가 기록)
 
-export async function saveAttempts(playId: string, callType: "npc_turn" | "belief" | "headline", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
+export async function saveAttempts(playId: string, callType: "turn_frame" | "npc_turn" | "belief" | "headline", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
   if (!storeEnabled() || attempts.length === 0) return;
   try {
     const res = await rest("llm_calls", {

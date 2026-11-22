@@ -57,7 +57,10 @@ export default guarded(async (req, res) => {
   const started = Date.now();
   const result = await npcReply(state, check.text);
   const idx = state.turns.length + 1;
-  waitUntil(saveAttempts(state.id, "npc_turn", idx, NPC_PROMPT_VERSION, result.attempts));
+  waitUntil(Promise.all([
+    saveAttempts(state.id, "turn_frame", idx, NPC_PROMPT_VERSION, result.factsAttempts),
+    saveAttempts(state.id, "npc_turn", idx, NPC_PROMPT_VERSION, result.attempts),
+  ]));
   if (!result.ok) {
     console.warn("[turn] generation_failed", state.id, idx, result.failure.message);
     return fail(res, "generation_failed", `${PARTNERS[state.partner ?? "m"].name}가 잠깐 말을 고르고 있어요. 같은 말을 다시 보내 주세요.`);
@@ -68,7 +71,7 @@ export default guarded(async (req, res) => {
     player: check.text,
     npc: reply.beats,
     move: reply.move,
-    frame: reply.frame,
+    facts: reply.facts,
     thought: reply.reason,
     noticed: reply.noticed,
     suggested: reply.suggested,
@@ -86,7 +89,7 @@ export default guarded(async (req, res) => {
       noticed: reply.noticed,
       suggested_drop: turn.suggested,
       labels: turn.labels,
-      state_frame: reply.frame,
+      state_frame: reply.facts,
       applied_drop: turn.applied,
       score_after: turn.scoreAfter,
       model: reply.model,

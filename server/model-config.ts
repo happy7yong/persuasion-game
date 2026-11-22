@@ -38,8 +38,9 @@ export function modelConfig(call: CallType): CallModelConfig {
   }
   if (call === "npc_turn") {
     return {
-      // 실제 대사는 자연스러운 말투가 중요하므로 별도 모델을 쓴다.
-      model: process.env.NPC_DIALOGUE_MODEL || process.env.NPC_MODEL || "openai/gpt-5.6-terra",
+      // 실제 대사 모델. NPC_DIALOGUE_MODEL로 따로 바꿀 수 있다 (예: openai/gpt-5.6-terra, 호출당 비용 약 5배).
+      // 구조 재설계 중에는 비용을 줄이려고 기본값을 mini로 둔다 (docs/dialogue-architecture.md).
+      model: process.env.NPC_DIALOGUE_MODEL || process.env.NPC_MODEL || "openai/gpt-5.4-mini",
       maxTokens: 700,
       timeoutMs: 21_000,
       budgetMs: 43_000,

@@ -1,5 +1,6 @@
 // 저장된 마디로 토큰의 상태를 따라잡는다. 응답을 못 받은 클라이언트가 옛 토큰으로 다시 와도
 // 서버의 기록이 기준이 된다.
+import { isTurnFacts } from "./ledger.js";
 import { recordTurn, type GameState } from "./rules.js";
 import type { StoredTurn } from "./store.js";
 
@@ -14,7 +15,7 @@ export function catchUp(state: GameState, rows: readonly StoredTurn[]): { latest
   let latest = state;
   for (const r of extra) {
     if (latest.finished) break;
-    latest = recordTurn(latest, { player: r.player_text, npc: r.npc_beats, ...(r.npc_move ? { move: r.npc_move } : {}), ...(r.state_frame ? { frame: r.state_frame } : {}), ...(r.reason ? { thought: r.reason } : {}), ...(r.noticed ? { noticed: r.noticed } : {}), suggested: Number(r.suggested_drop), labels: r.labels });
+    latest = recordTurn(latest, { player: r.player_text, npc: r.npc_beats, ...(r.npc_move ? { move: r.npc_move } : {}), ...(isTurnFacts(r.state_frame) ? { facts: r.state_frame } : {}), ...(r.reason ? { thought: r.reason } : {}), ...(r.noticed ? { noticed: r.noticed } : {}), suggested: Number(r.suggested_drop), labels: r.labels });
   }
   return { latest, extra };
 }

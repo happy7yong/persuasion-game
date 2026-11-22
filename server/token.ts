@@ -31,12 +31,12 @@ export function decodeState(token: unknown, now = Date.now()): GameState | null 
     const json = Buffer.concat([decipher.update(Buffer.from(body, "base64url")), decipher.final()]).toString("utf8");
     const state = JSON.parse(json) as GameState;
     if (state.v !== 1 || now - state.startedAt > TOKEN_MAX_AGE_MS) return null;
-    // 상태 레이어 도입 전 토큰도 같은 판 안에서는 이어갈 수 있게 초기 세션 상태를 채운다.
-    if (!state.currentMind || !state.relationship) {
+    // 장부 도입 전 토큰도 같은 판 안에서는 이어갈 수 있게 초기 장부·마음을 채운다 (예전 관계 상태는 버린다).
+    if (!Array.isArray(state.ledger) || !state.currentMind) {
       const initial = newGame(state.id, state.startedAt, state.heardBefore, state.partner ?? "m");
-      return { ...state, currentMind: initial.currentMind, relationship: initial.relationship };
+      return { ...state, currentMind: initial.currentMind, ledger: initial.ledger, progress: [] };
     }
-    if (!Array.isArray(state.relationship.progress)) state.relationship.progress = [];
+    if (!Array.isArray(state.progress)) state.progress = [];
     return state;
   } catch {
     return null;

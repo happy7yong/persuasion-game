@@ -22,6 +22,7 @@ const { buildReport } = await import("../server/report.js");
 const { writeBelief } = await import("../server/belief.js");
 const { writeHeadline } = await import("../server/headline.js");
 const { isScripted } = await import("../server/llm.js");
+const { ledgerLines } = await import("../server/ledger.js");
 
 const c = { dim: (s: string) => `\x1b[2m${s}\x1b[0m`, b: (s: string) => `\x1b[1m${s}\x1b[0m`, blue: (s: string) => `\x1b[34m${s}\x1b[0m`, yellow: (s: string) => `\x1b[33m${s}\x1b[0m` };
 type Beat = { type: "narration" | "dialogue"; content: string };
@@ -30,12 +31,9 @@ const show = (beats: Beat[], name: string) => {
 };
 const showState = (s: typeof state) => {
   const m = s.currentMind;
-  const live = (xs: { text: string; status: string }[]) => xs.filter((x) => x.status === "held").map((x) => x.text).join(" / ") || "없음";
   console.log(c.dim(`  마음  피곤 ${m.fatigue} · 미안함 ${m.guilt} · 방어심 ${m.defensiveness} · 챙김 ${m.care} · 열림 ${m.openness}`));
-  console.log(c.dim(`  초점  ${m.focus} / 바람  ${m.want}`));
-  console.log(c.dim(`  관계  인정: ${live(s.relationship.acknowledged)} | 유지: ${live(s.relationship.retained)}`));
-  console.log(c.dim(`        미해결: ${live(s.relationship.unresolved)} | 제안: ${live(s.relationship.proposals)} | 합의: ${s.relationship.agreement}`));
-  console.log(c.dim(`        플레이어 태도: ${live(s.relationship.playerStances)} | 점수 이벤트: ${s.relationship.progress.map((x) => x.type === "mutual_agreement" ? x.type : `${x.type}:${x.issue}`).join(", ") || "없음"}`));
+  console.log(c.dim(ledgerLines(s.ledger, "neutral").split("\n").map((l) => `  ${l}`).join("\n")));
+  console.log(c.dim(`  점수 이벤트: ${s.progress.map((x) => (x.type === "mutual_agreement" ? x.type : `${x.type}:${x.issue}`)).join(", ") || "없음"}`));
 };
 
 const partner = process.argv[2] === "f" ? "f" : "m";
@@ -100,9 +98,9 @@ while (!state.finished) {
     console.log(c.dim(`(생성 실패: ${r.failure.message} — 같은 말을 다시 보내 보세요)`));
     continue;
   }
-  const p = buildNpcPrompt(before, check.text, r.reply.move, r.reply.frame);
+  const p = buildNpcPrompt(before, check.text, r.reply.move, r.reply.facts);
   lastPrompt = `${p.system}\n\n----- user -----\n${p.user}`;
-  state = recordTurn(state, { player: check.text, npc: r.reply.beats, move: r.reply.move, frame: r.reply.frame, thought: r.reply.reason, noticed: r.reply.noticed, suggested: r.reply.suggested, labels: r.reply.labels });
+  state = recordTurn(state, { player: check.text, npc: r.reply.beats, move: r.reply.move, facts: r.reply.facts, thought: r.reply.reason, noticed: r.reply.noticed, suggested: r.reply.suggested, labels: r.reply.labels });
   const t = state.turns.at(-1)!;
   show(r.reply.beats, name);
   console.log(
@@ -112,7 +110,8 @@ while (!state.finished) {
     const b = t.scoreBreakdown;
     console.log(c.dim(`  점수 산식  AI ${b.base}${b.eventBonus ? ` + 이벤트 ${b.eventBonus}` : ""}${b.mindBonus ? ` + 마음 ${b.mindBonus}` : ""} = ${b.applied}`));
   }
-  const evaluation = t.frame?.evaluation;
+  if (t.facts) console.log(c.dim(`  발화 행위  ${t.facts.acts.map((x) => `${x.act}${x.refersTo ? `→${x.refersTo}` : ""}`).join(", ")}${t.facts.resolved.length ? ` · 정리됨 ${t.facts.resolved.map((x) => `${x.id}:${x.status}`).join(", ")}` : ""}`));
+  const evaluation = t.facts?.evaluation;
   if (evaluation) {
     console.log(c.dim(`  AI 평가  ${evaluation.reason}`));
     if (evaluation.evidence.length) console.log(c.dim(`  평가 근거  ${evaluation.evidence.map((x) => `“${x}”`).join(" · ")}`));
