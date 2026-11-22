@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, newKey, PARTNER_OPTIONS, type Beat, type Exchange, type Partner, type StartResponse, type Stats } from "./api";
+import { api, ApiError, newKey, PARTNER_OPTIONS, type Beat, type Exchange, type Partner, type Report, type StartResponse, type Stats } from "./api";
 import { ReportView } from "./Report";
 import { tag, tagPlay, track } from "./clarity";
 import { clearGame, loadGame, saveGame, type Msg, type SavedGame } from "./storage";
@@ -7,6 +7,17 @@ import { clearGame, loadGame, saveGame, type Msg, type SavedGame } from "./stora
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const reduceMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const chars = (s: string) => Array.from(s).length;
+const INTRO_TITLE = "우리 얘기 좀 해";
+const DEV_REPORT: Report = {
+  kind: "report", v: 1, npcName: "윤재", outcome: "compromise", shake: 63, successShake: 70, strongestTurn: 3, weakestTurn: 1,
+  turns: [
+    { turn: 1, player: "8시간 동안 연락이 안 돼서 걱정했어.", npc: [{ type: "dialogue", content: "걱정한 건 알겠어. 일부러 피한 건 아니야." }], gain: 6, total: 6, thought: "걱정하게 만든 건 미안한데, 내 의도도 알아줬으면 해." },
+    { turn: 2, player: "일할 때 바로 못 보는 날이 있다는 건 이해해.", npc: [{ type: "dialogue", content: "그렇게 말해주니까 나도 좀 풀린다." }], gain: 14, total: 20, thought: "내 사정을 먼저 봐준 건 고맙다." },
+    { turn: 3, player: "오래 비는 날엔 나중에 이유를 먼저 말해줘.", npc: [{ type: "dialogue", content: "그 정도는 내가 먼저 말할게." }], gain: 18, total: 38, thought: "그 방법이면 나도 해볼 수 있겠다." },
+    { turn: 4, player: "나는 무시한다고 몰아붙이지 않고 걱정됐다고 말할게.", npc: [{ type: "dialogue", content: "그럼 나도 답이 늦은 이유부터 말할게." }], gain: 14, total: 52, thought: "서로 할 수 있는 쪽으로 말하니까 납득이 간다." },
+    { turn: 5, player: "오늘은 밥 먹으면서 더 얘기하자.", npc: [{ type: "dialogue", content: "그래. 나도 배고팠어." }], gain: 11, total: 63, thought: "당장 다 끝내진 않아도 같이 풀어가면 되겠다." },
+  ],
+};
 
 export function App() {
   const [session, setSession] = useState<SavedGame | null>(() => loadGame());
@@ -24,6 +35,11 @@ export function App() {
     if (session?.game.playId) tagPlay(session.game.playId);
   }, [session?.game.playId]);
 
+  const developerPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get("dev") === "result";
+  if (developerPreview) {
+    return <><ReportView report={DEV_REPORT} stats={{ total: 18, finished: 18, persuaded: 7, best: 71 }} token="" preview onRetry={() => window.location.assign(window.location.pathname)} /><AppFooter showDesignNotes /></>;
+  }
+
   const restart = () => {
     clearGame();
     setSession(null);
@@ -31,19 +47,34 @@ export function App() {
   };
 
   if (!session) {
-    return (
-      <Intro
+    return <><Intro
         stats={stats}
         onStart={(g) =>
           setSession({ v: 1, game: g, token: g.token, msgs: [], turns: 0, left: g.rules.charBudget, finished: false, ending: null })
         }
-      />
-    );
+      /><AppFooter /></>;
   }
   if (session.ending) {
-    return <ReportView report={session.ending.data} stats={session.ending.stats} token={session.token} onRetry={restart} />;
+    return <><ReportView report={session.ending.data} stats={session.ending.stats} token={session.token} onRetry={restart} /><AppFooter showDesignNotes /></>;
   }
-  return <Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} />;
+  return <><Chat session={session} update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))} onRestart={restart} /><AppFooter /></>;
+}
+
+function AppFooter({ showDesignNotes = false }: { showDesignNotes?: boolean }) {
+  return <>
+    {showDesignNotes && (
+      <aside className="design-notes" aria-label="피드백 설계 참고">
+        <p className="design-notes-title">설계 참고</p>
+        <p>이 피드백은 관계를 진단하거나 정답을 판정하지 않아요. 실제 발화와 상대가 유지한 입장을 바탕으로 대화의 흐름을 돌아보기 위한 장치예요.</p>
+        <ul>
+          <li><a href="https://academic.oup.com/edited-volume/38162/chapter/332989072" target="_blank" rel="noreferrer">파트너 반응성</a> — 이해·인정·돌봄이 관계 경험에 미치는 과정</li>
+          <li><a href="https://doi.org/10.1037/0033-2909.119.2.254" target="_blank" rel="noreferrer">Kluger &amp; DeNisi (1996)</a> — 사람 자체보다 행동과 과제에 초점을 둔 피드백</li>
+          <li><a href="https://www.tandfonline.com/doi/full/10.1080/08975353.2015.1038962" target="_blank" rel="noreferrer">Gottman et al.</a> — 갈등에서 공격·방어를 협력으로 돌리는 repair 과정</li>
+        </ul>
+      </aside>
+    )}
+    <footer className="app-footer">문의 · <a href="mailto:chaeyoung7742@gmail.com">chaeyoung7742@gmail.com</a></footer>
+  </>;
 }
 
 function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResponse) => void }) {
@@ -73,7 +104,19 @@ function Intro({ stats, onStart }: { stats: Stats | null; onStart: (g: StartResp
     <main className="intro">
       <div className="intro-card">
         <p className="intro-scene">금요일 밤, 동네 카페</p>
-        <h1 className="intro-title">우리 얘기 좀 해</h1>
+        <h1 className="intro-title" aria-label={INTRO_TITLE}>
+          {Array.from(INTRO_TITLE).map((letter, i) =>
+            letter === " " ? (
+              <span key={i} className="intro-title-space" aria-hidden="true" />
+            ) : (
+              <span key={i} className="intro-title-mask" aria-hidden="true">
+                <span className="intro-title-letter" style={{ animationDelay: `${140 + i * 58}ms` }}>
+                  {letter}
+                </span>
+              </span>
+            ),
+          )}
+        </h1>
         <p className="intro-lede">
           오늘 하루 종일 연락이 없던 연인{chosen ? ` ${chosen.name}` : ""}.
           <br />
@@ -144,14 +187,14 @@ function KakaoCard({ game }: { game: StartResponse }) {
         <ol className="kakao-list">
           {game.scenario.kakao.map((k, i) => (
             <li key={i} className={`kakao-row ${k.from}`}>
-              {k.readAt && <div className="kakao-read">{k.readAt} 읽음</div>}
               <div className="kakao-line">
                 <span className="kakao-bubble">{k.text}</span>
                 <time>{k.time}</time>
               </div>
+              {k.readAt && <div className="kakao-read">읽음 · {k.readAt}</div>}
             </li>
           ))}
-          <li className="kakao-note">답장 없이 지나간 시간 약 8시간 반 · 그 사이 보낸 메시지 7개</li>
+          <li className="kakao-note">약 8시간 반 동안 답장 없음 · 15:32에 한 번 읽음 · 그 사이 보낸 메시지 7개</li>
         </ol>
       )}
     </section>

@@ -12,7 +12,7 @@ const cfg: CallModelConfig = { ...modelConfig("npc_turn"), timeoutMs: 50, budget
 const call = { system: "s", user: "u", schemaName: "t", schema: {} };
 const okBody = (content: string) =>
   new Response(JSON.stringify({ model: "m", choices: [{ message: { content }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 2, cost: 0.001 } }));
-const goodNpc = JSON.stringify({ beats: [{ type: "dialogue", content: "응" }], evaluation: { suggested_drop: 5, labels: ["emotion"], reason: "r" } });
+const goodNpc = JSON.stringify({ beats: [{ type: "dialogue", content: "응" }], thought: "알겠어" });
 
 describe("시간 예산", () => {
   it("재시도까지 포함한 예산이 함수 상한 안에 들어간다", () => {
@@ -21,6 +21,11 @@ describe("시간 예산", () => {
       expect(c.timeoutMs * c.maxAttempts).toBeLessThanOrEqual(c.budgetMs);
       expect(c.budgetMs).toBeLessThan(FUNCTION_MAX_DURATION_MS);
     }
+  });
+  it("턴 해석과 대사 생성을 합쳐도 함수 상한 안에 든다", () => {
+    const frame = modelConfig("turn_frame");
+    const reply = modelConfig("npc_turn");
+    expect(frame.budgetMs + reply.budgetMs).toBeLessThan(FUNCTION_MAX_DURATION_MS);
   });
 });
 

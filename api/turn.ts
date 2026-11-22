@@ -64,7 +64,16 @@ export default guarded(async (req, res) => {
   }
 
   const { reply } = result;
-  const next = recordTurn(state, { player: check.text, npc: reply.beats, move: reply.move, thought: reply.reason, noticed: reply.noticed, suggested: reply.suggested, labels: reply.labels });
+  const next = recordTurn(state, {
+    player: check.text,
+    npc: reply.beats,
+    move: reply.move,
+    frame: reply.frame,
+    thought: reply.reason,
+    noticed: reply.noticed,
+    suggested: reply.suggested,
+    labels: reply.labels,
+  });
   const turn = next.turns.at(-1)!;
   try {
     const saved = await insertTurn(state, {
@@ -77,6 +86,7 @@ export default guarded(async (req, res) => {
       noticed: reply.noticed,
       suggested_drop: turn.suggested,
       labels: turn.labels,
+      state_frame: reply.frame,
       applied_drop: turn.applied,
       score_after: turn.scoreAfter,
       model: reply.model,

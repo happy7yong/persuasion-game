@@ -1,10 +1,16 @@
-// "○○가 본 너": 대화가 끝난 뒤 연인이 플레이어를 어떻게 봤는지 (server/belief.ts).
-// 연인의 관점이라 틀릴 수 있다는 것을 먼저 밝히고, 판단마다 근거가 된 말을 붙인다.
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, type Belief } from "./api";
 import { track } from "./clarity";
 
 type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ready"; belief: Belief };
+
+const PREVIEW_FEEDBACK: Belief = {
+  kind: "feedback", npcName: "윤재", summary: "상대의 한계를 받아들인 뒤 원하는 행동을 좁혀 말한 흐름이 가장 설득력 있었어요.", closing: "상대의 입장을 먼저 받아준 뒤, 내가 바라는 한 가지를 구체적으로 말해 보세요.",
+  points: [
+    { strength: "윤재의 업무 한계를 먼저 인정했어요", turn: 2, quote: "바로 못 보는 날이 있다는 건 이해해", improve: "그 한계가 내게 어떤 불안을 만들었는지도 함께 연결하면 좋아요.", suggestion: "바쁜 건 이해해. 다만 이유를 몰라서 내가 불안했던 건 알아줬으면 해." },
+    { strength: "실제로 가능한 방법을 하나로 좁혔어요", turn: 3, quote: "이유를 먼저 말해줘", improve: "나도 바꿀 행동을 함께 말하면 일방적인 요구로 들리지 않아요.", suggestion: "너는 이유를 먼저 말해주고, 나는 걱정됐다고 말하는 걸로 해보자." },
+  ],
+};
 
 function goToTurn(turn: number) {
   const el = document.getElementById(`turn-${turn}`);
@@ -15,10 +21,8 @@ function goToTurn(turn: number) {
   window.setTimeout(() => el.classList.remove("flash"), 1400);
 }
 
-export function BeliefCard({ token, npcName }: { token: string; npcName: string }) {
-  const [state, setState] = useState<State>({ kind: "loading" });
-  const [verdict, setVerdict] = useState<"agree" | "disagree" | null>(null);
-  const [saving, setSaving] = useState(false);
+export function BeliefCard({ token, npcName, preview = false }: { token: string; npcName: string; preview?: boolean }) {
+  const [state, setState] = useState<State>(() => (preview ? { kind: "ready", belief: { ...PREVIEW_FEEDBACK, npcName } } : { kind: "loading" }));
   const started = useRef(false);
 
   const load = async () => {
@@ -33,35 +37,23 @@ export function BeliefCard({ token, npcName }: { token: string; npcName: string 
   };
 
   useEffect(() => {
+    if (preview) return;
     if (started.current) return;
     started.current = true;
     void load();
-  }, []);
-
-  const answer = async (v: "agree" | "disagree") => {
-    setSaving(true);
-    try {
-      await api.feedback(token, v);
-      setVerdict(v);
-      track(v === "agree" ? "belief_agree" : "belief_disagree");
-    } catch {
-      /* 저장에 실패하면 다시 누를 수 있게 둔다 */
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [preview]);
 
   return (
     <section className="belief" aria-labelledby="belief-title" data-clarity-unmask="true">
       <h2 id="belief-title" className="belief-title">
-        {npcName}가 본 너
+        대화 돌아보기
       </h2>
-      <p className="belief-desc">다섯 마디 동안 {npcName}가 느낀 대로예요. {npcName}의 관점이라 틀릴 수 있어요.</p>
+      <p className="belief-desc">{npcName}가 반응한 말과, 아직 풀리지 않은 얘기를 모아뒀어요.</p>
 
       {state.kind === "loading" && (
         <div className="belief-loading" role="status">
           <span className="spinner small" aria-hidden="true" />
-          {npcName}가 너를 어떻게 봤는지 정리하는 중…
+          대화 흐름을 정리하는 중…
         </div>
       )}
 
@@ -80,34 +72,17 @@ export function BeliefCard({ token, npcName }: { token: string; npcName: string 
           <ol className="belief-points">
             {state.belief.points.map((p, i) => (
               <li key={i}>
-                <p className="belief-claim">{p.claim}</p>
+                <p className="belief-suggestion"><span>다음에 말해보기</span>{p.suggestion}</p>
+                <p className="belief-claim">좋았던 점 · {p.strength}</p>
                 <button className="evidence" onClick={() => goToTurn(p.turn)} aria-label={`근거: ${p.turn}번째 말로 이동`}>
                   <span className="evidence-label">근거 · {p.turn}번째 말</span>
                   <span className="evidence-quote">“{p.quote}”</span>
                 </button>
-                <p className="belief-why">{p.why}</p>
+                <p className="belief-why">보완할 점 · {p.improve}</p>
               </li>
             ))}
           </ol>
-          <p className="belief-expect">{state.belief.expectation}</p>
-
-          <div className="belief-feedback">
-            {verdict ? (
-              <p role="status">{verdict === "agree" ? `${npcName}한테 전해 둘게요.` : `${npcName}가 다음엔 더 잘 볼 수 있게 기록해 둘게요.`}</p>
-            ) : (
-              <>
-                <p>{npcName}가 본 너, 맞는 것 같아요?</p>
-                <div className="belief-buttons">
-                  <button className="secondary small" onClick={() => void answer("agree")} disabled={saving}>
-                    맞아
-                  </button>
-                  <button className="secondary small" onClick={() => void answer("disagree")} disabled={saving}>
-                    좀 달라
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <p className="belief-expect">{state.belief.closing}</p>
         </>
       )}
     </section>

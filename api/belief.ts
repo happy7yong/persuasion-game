@@ -20,7 +20,8 @@ export default guarded(async (req, res) => {
     const rows = await listTurns(state.id);
     if (rows) state = catchUp(state, rows).latest;
     const cached = await storedBelief(state.id);
-    if (cached) return send(res, 200, { belief: cached });
+    // 예전 "내가 본 너" 캐시는 새 피드백 형식과 달라서 다시 만든다.
+    if (cached && typeof cached === "object" && (cached as { kind?: unknown }).kind === "feedback") return send(res, 200, { belief: cached });
   } catch {
     return fail(res, "service_unavailable", "기록 저장소에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   }

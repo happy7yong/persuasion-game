@@ -19,12 +19,12 @@ const game = (partner: "m" | "f" = "m"): GameState => {
 };
 
 const good = {
-  summary: "내가 본 너는 서운한 걸 참는 사람은 아닌 것 같아.",
+  summary: "구체적인 이유를 말한 마디가 설득에 도움이 됐어요.",
   points: [
-    { claim: "서운한 건 돌려 말하지 않는 사람", turn: 2, quote: "내 안식처가 된단 말이야", why: "그렇게까지 말할 줄은 몰랐거든." },
-    { claim: "방법부터 꺼내는 사람", turn: 3, quote: "밥 사주는 규칙", why: "싸우다 말고 밥 얘기라니." },
+    { strength: "감정의 이유를 직접 말했어요", turn: 2, quote: "내 안식처가 된단 말이야", improve: "윤재의 업무 한계에는 아직 답하지 못했어요", suggestion: "바쁜 건 이해해. 대신 내가 불안했던 이유도 봐줘." },
+    { strength: "구체적인 방법을 제안했어요", turn: 3, quote: "밥 사주는 규칙", improve: "상대가 할 수 있는 범위를 함께 확인하면 좋아요", suggestion: "네가 가능한 방식으로 한 가지만 정해보자." },
   ],
-  expectation: "다음에 내가 또 연락 못 하면, 너는 아마 밥부터 사라고 하겠지.",
+  closing: "상대의 한계를 인정한 뒤 원하는 행동을 하나로 좁혀 말해보세요.",
 };
 
 describe("근거 검사", () => {
@@ -38,18 +38,18 @@ describe("근거 검사", () => {
   });
 
   it("엄격한 시도: 근거가 하나라도 가짜면 다시 생성", () => {
-    const fake = { ...good, points: [...good.points, { claim: "질투가 많은 사람", turn: 1, quote: "원래 질투 많잖아", why: "그냥 느낌" }] };
+    const fake = { ...good, points: [...good.points, { strength: "x", turn: 1, quote: "원래 질투 많잖아", improve: "x", suggestion: "x" }] };
     expect(() => parseBelief(game(), fake, true)).toThrow(/belief_evidence/);
   });
 
   it("마지막 시도: 근거가 맞는 판단만 남긴다", () => {
-    const fake = { ...good, points: [...good.points, { claim: "질투가 많은 사람", turn: 1, quote: "원래 질투 많잖아", why: "그냥 느낌" }] };
+    const fake = { ...good, points: [...good.points, { strength: "x", turn: 1, quote: "원래 질투 많잖아", improve: "x", suggestion: "x" }] };
     const out = parseBelief(game(), fake, false);
     expect(out.points.map((p) => p.turn)).toEqual([2, 3]);
   });
 
   it("근거가 하나도 없으면 받지 않는다", () => {
-    const none = { ...good, points: [{ claim: "x", turn: 1, quote: "없는 말", why: "y" }] };
+    const none = { ...good, points: [{ strength: "x", turn: 1, quote: "없는 말", improve: "x", suggestion: "y" }] };
     expect(() => parseBelief(game(), none, false)).toThrow(/no_evidence/);
   });
 
@@ -64,19 +64,19 @@ describe("프롬프트", () => {
   it("연인의 Core, 결과, 마디별 말과 알게 된 것을 넣는다", () => {
     const p = buildBeliefPrompt(game());
     expect(p.system).toContain("# 인물 Core: 윤재");
-    expect(p.system).toContain("틀릴 수 있다");
+    expect(p.system).toContain("다음 대화에서 더 잘 설득");
     expect(p.user).toContain("54% 움직였다");
     expect(p.user).toContain("- 플레이어: 너의 잠깐의 연락이 내 안식처가 된단 말이야");
-    expect(p.user).toContain("- 그때 네가 알게 된 것: 서운한 건 돌려 말하지 않음");
+    expect(p.user).toContain("- 그때 포착한 플레이어의 태도: 서운한 건 돌려 말하지 않음");
   });
   it("서아 판에는 윤재가 남지 않는다", () => {
     const p = buildBeliefPrompt(game("f"));
     expect(p.system + p.user).not.toContain("윤재");
   });
-  it("마디 응답에서 알게 된 것(noticed)을 받는다", () => {
-    const out = parseNpcOutput({ beats: [{ type: "dialogue", content: "응" }], evaluation: { suggested_drop: 5, labels: [], reason: "r", noticed: "방법부터 꺼냄" } });
-    expect(out.noticed).toBe("방법부터 꺼냄");
-    expect(buildNpcPrompt(newGame("x", Date.now(), false), "안녕", "counter").system).toContain("noticed");
+  it("알게 된 것(noticed)은 대사 전 평가에서 분리한다", () => {
+    const out = parseNpcOutput({ beats: [{ type: "dialogue", content: "응" }], thought: "알겠어" });
+    expect(out.reason).toBe("알겠어");
+    expect(buildNpcPrompt(newGame("x", Date.now(), false), "안녕", "counter").system).not.toContain("suggested_drop");
   });
 });
 

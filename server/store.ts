@@ -4,7 +4,7 @@
 // - 멱등: (play_id, idx) 고유 제약 + 요청마다 idempotency_key. 같은 키의 재전송은 처음 결과를 돌려준다.
 // Supabase가 설정되지 않으면 저장 없이 동작한다 (로컬·대본 모드). 이때는 멱등 보장이 없다.
 import type { AttemptRecord, LlmUsage } from "./llm.js";
-import type { GameState, NpcMove, StrategyLabel } from "./rules.js";
+import type { GameState, NpcMove, StrategyLabel, TurnFrame } from "./rules.js";
 
 export class StoreError extends Error {}
 
@@ -139,6 +139,21 @@ export async function saveBelief(playId: string, belief: unknown): Promise<void>
   await ok(await rest(`plays?id=eq.${encodeURIComponent(playId)}`, { method: "PATCH", prefer: "return=minimal", body: { belief } }));
 }
 
+// ------------------------------------------------------------------ headline (은하 신문 1면)
+// select=*: headline 컬럼이 아직 없는 DB에서도 읽기는 실패하지 않는다 (없으면 매번 새로 만든다).
+
+export async function storedHeadline(playId: string): Promise<unknown | null> {
+  if (!storeEnabled()) return null;
+  const res = await ok(await rest(`plays?select=*&id=eq.${encodeURIComponent(playId)}`, { method: "GET" }));
+  const rows = (await res.json()) as { headline?: unknown }[];
+  return rows[0]?.headline ?? null;
+}
+
+export async function saveHeadline(playId: string, headline: unknown): Promise<void> {
+  if (!storeEnabled()) return;
+  await ok(await rest(`plays?id=eq.${encodeURIComponent(playId)}`, { method: "PATCH", prefer: "return=minimal", body: { headline } }));
+}
+
 /** 플레이어가 "맞아 / 좀 달라"를 고른 결과. 마지막 선택이 남는다. */
 export async function saveBeliefFeedback(playId: string, verdict: "agree" | "disagree"): Promise<void> {
   if (!storeEnabled()) return;
@@ -163,6 +178,7 @@ export interface StoredTurn {
   noticed?: string | null;
   suggested_drop: number;
   labels: StrategyLabel[];
+  state_frame?: TurnFrame | null;
 }
 
 /** 이 판에 저장된 마디들 (idx 순). 저장소가 꺼져 있으면 null. */
@@ -190,7 +206,7 @@ export async function insertTurn(
 
 // ------------------------------------------------------------------ trace (부가 기록)
 
-export async function saveAttempts(playId: string, callType: "npc_turn" | "belief", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
+export async function saveAttempts(playId: string, callType: "npc_turn" | "belief" | "headline", turnIdx: number | null, promptVersion: string, attempts: AttemptRecord[]): Promise<void> {
   if (!storeEnabled() || attempts.length === 0) return;
   try {
     const res = await rest("llm_calls", {

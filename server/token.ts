@@ -1,7 +1,7 @@
 // 게임 상태 토큰. AES-256-GCM으로 암호화하므로 클라이언트는 상태를 읽을 수도(숨긴 마음 지수 포함),
 // 바꿀 수도 없다. 바꾸면 인증 태그가 맞지 않아 거부된다.
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import type { GameState } from "./rules.js";
+import { newGame, type GameState } from "./rules.js";
 
 export const TOKEN_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 
@@ -31,6 +31,12 @@ export function decodeState(token: unknown, now = Date.now()): GameState | null 
     const json = Buffer.concat([decipher.update(Buffer.from(body, "base64url")), decipher.final()]).toString("utf8");
     const state = JSON.parse(json) as GameState;
     if (state.v !== 1 || now - state.startedAt > TOKEN_MAX_AGE_MS) return null;
+    // 상태 레이어 도입 전 토큰도 같은 판 안에서는 이어갈 수 있게 초기 세션 상태를 채운다.
+    if (!state.currentMind || !state.relationship) {
+      const initial = newGame(state.id, state.startedAt, state.heardBefore, state.partner ?? "m");
+      return { ...state, currentMind: initial.currentMind, relationship: initial.relationship };
+    }
+    if (!Array.isArray(state.relationship.progress)) state.relationship.progress = [];
     return state;
   } catch {
     return null;

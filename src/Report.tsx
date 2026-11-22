@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Outcome, Report, Stats } from "./api";
 import { BeliefCard } from "./BeliefCard";
+import { HeadlineCard } from "./HeadlineCard";
 import { track } from "./clarity";
 
 // 연인 이름은 모두 받침이 없어 조사가 같다 (server/content.ts PARTNERS)
@@ -30,7 +31,7 @@ function useCountUp(to: number): number {
   return n;
 }
 
-export function ReportView({ report, stats, token, onRetry }: { report: Report; stats: Stats | null; token: string; onRetry: () => void }) {
+export function ReportView({ report, stats, token, onRetry, preview = false }: { report: Report; stats: Stats | null; token: string; onRetry: () => void; preview?: boolean }) {
   const { npcName, outcome, shake, successShake, turns } = report;
   const shown = useCountUp(shake);
   const [copied, setCopied] = useState("");
@@ -84,6 +85,8 @@ export function ReportView({ report, stats, token, onRetry }: { report: Report; 
         )}
       </section>
 
+      {!preview && <HeadlineCard token={token} />}
+
       <h2 className="report-h">마디별로 보기</h2>
       <ol className="report-turns">
         {turns.map((t) => {
@@ -129,7 +132,7 @@ export function ReportView({ report, stats, token, onRetry }: { report: Report; 
         })}
       </ol>
 
-      <BeliefCard token={token} npcName={npcName} />
+      <BeliefCard token={token} npcName={npcName} preview={preview} />
 
       <div className="report-actions">
         <button className="primary" onClick={() => (track("retry_clicked"), onRetry())}>

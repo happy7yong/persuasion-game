@@ -18,7 +18,8 @@ create table if not exists plays (
   ending jsonb,                     -- 대화 리포트
   belief jsonb,                     -- "내가 본 너" (판단·근거·예상)
   belief_feedback text,             -- agree | disagree
-  belief_feedback_at timestamptz
+  belief_feedback_at timestamptz,
+  headline jsonb                    -- 은하 신문 1면
 );
 
 create table if not exists turns (
@@ -47,7 +48,7 @@ create table if not exists turns (
 create table if not exists llm_calls (
   id bigint generated always as identity primary key,
   play_id text not null references plays(id) on delete cascade,
-  call_type text not null,          -- npc_turn | belief
+  call_type text not null,          -- npc_turn | belief | headline
   turn_idx int,                     -- ending이면 null
   attempt int not null,             -- 1, 2 (자동 재시도)
   prompt_version text,
@@ -86,6 +87,7 @@ alter table plays add column if not exists ending jsonb;
 alter table plays add column if not exists belief jsonb;
 alter table plays add column if not exists belief_feedback text;
 alter table plays add column if not exists belief_feedback_at timestamptz;
+alter table plays add column if not exists headline jsonb;
 
 alter table turns add column if not exists idempotency_key text;
 alter table turns add column if not exists npc_move text;
@@ -97,6 +99,7 @@ alter table turns add column if not exists model text;
 alter table turns add column if not exists usage jsonb;
 alter table turns add column if not exists elapsed_ms int;
 alter table turns add column if not exists prompt_version text;
+alter table turns add column if not exists state_frame jsonb;
 
 create unique index if not exists turns_play_idx_unique on turns(play_id, idx);
 

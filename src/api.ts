@@ -44,13 +44,24 @@ export interface Report {
   weakestTurn: number | null;
 }
 
-/** "내가 본 너" (server/belief.ts). 연인의 관점이라 틀릴 수 있다 */
+/** 대화 결과 피드백 (server/belief.ts). 실제 플레이어 발화 인용을 근거로 한다. */
 export interface Belief {
-  kind: "belief";
+  kind: "feedback";
   npcName: string;
   summary: string;
-  points: { claim: string; turn: number; quote: string; why: string }[];
-  expectation: string;
+  points: { strength: string; turn: number; quote: string; improve: string; suggestion: string }[];
+  closing: string;
+}
+
+/** 은하 신문 1면 (server/headline.ts) */
+export interface Headline {
+  kind: "headline";
+  title: string;
+  subtitle: string;
+  quote: string;
+  quoteTurn: number;
+  textbook: string;
+  sideArticles: string[];
 }
 
 export interface Stats {
@@ -100,6 +111,7 @@ export const api = {
   turn: (token: string, message: string, key: string) => post<TurnResponse>("/api/turn", { token, message, idempotency_key: key }),
   finish: (token: string, giveup: boolean) => post<{ token: string; report: Report; stats: Stats | null }>("/api/finish", { token, ...(giveup ? { giveup: true } : {}) }),
   belief: (token: string) => post<{ belief: Belief }>("/api/belief", { token }),
+  headline: (token: string) => post<{ headline: Headline }>("/api/headline", { token }),
   feedback: (token: string, verdict: "agree" | "disagree") => post<{ ok: true }>("/api/feedback", { token, verdict }),
   stats: async (): Promise<Stats | null> => {
     try {
