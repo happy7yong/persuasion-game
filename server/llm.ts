@@ -9,6 +9,8 @@ import type { CallModelConfig } from "./model-config.js";
 export interface LlmUsage {
   promptTokens: number | null;
   completionTokens: number | null;
+  /** 입력 중 프롬프트 캐시로 할인된 토큰 (앞부분이 이전 호출과 같을 때). 공급자가 알려 주지 않으면 null */
+  cachedTokens?: number | null;
   cost: number | null;
 }
 
@@ -102,7 +104,7 @@ export async function attemptOnce(
       model?: string;
       error?: { code?: number | string };
       choices?: { message?: { content?: string | null }; finish_reason?: string | null }[];
-      usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
+      usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number; prompt_tokens_details?: { cached_tokens?: number } };
     };
     record.respondedModel = data.model ?? null;
     record.finishReason = data.choices?.[0]?.finish_reason ?? null;
@@ -110,6 +112,7 @@ export async function attemptOnce(
       record.usage = {
         promptTokens: data.usage.prompt_tokens ?? null,
         completionTokens: data.usage.completion_tokens ?? null,
+        cachedTokens: data.usage.prompt_tokens_details?.cached_tokens ?? null,
         cost: data.usage.cost ?? null,
       };
     }

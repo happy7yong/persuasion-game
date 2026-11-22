@@ -150,17 +150,20 @@ export function buildNpcPrompt(
   const ledgerAfter = facts ? applyFacts(state.ledger, facts, state.turns.length + 1) : state.ledger;
   const partner = state.partner ?? "m";
   const finalTurn = isFinalTurn(state);
+  // 순서: 매번 같은 부분(규칙·Core·장면·출력 형식·반복 금지)을 앞에, 매 마디 바뀌는 부분을 뒤에.
+  // 앞부분이 이전 호출과 같으면 공급자의 프롬프트 캐시로 입력이 할인된다 (usage.cachedTokens로 확인).
   const system = [
     ENGINE_RULES,
     COMMON_PRINCIPLES,
     coreFor(partner),
     `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
+    OUTPUT_FORMAT,
+    "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.",
+    // ---- 여기부터 매 마디 바뀐다
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
     `# 지금 마음\n${mindLine(state)}\nCore의 성향대로 이 마음이 방금 말을 어떻게 듣게 하는지는 네가 판단한다.`,
     `# 대화 장부 (이번 마디까지 확정된 사실)\n${ledgerLines(ledgerAfter, "npc")}\n열림은 아직 풀리지 않은 것, 받아들여짐·거둬들임은 이미 정리된 것이다. 정리된 것을 처음 말하는 것처럼 다시 꺼내지 않는다.`,
-    "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.",
     facts ? `# 방금 플레이어의 말에서 확인된 것\n${factsLines(facts, ledgerAfter)}` : null,
-    OUTPUT_FORMAT,
     move === null && finalTurn
       ? "# 마지막 응답의 결정\n이번이 마지막 플레이어 발화다. 지금까지 대화와 방금 말을 모두 읽고 이번 대화의 결말을 정한다. 플레이어가 네 핵심 걱정·반론에 직접 답하고, 실제로 납득할 이유를 보였다면 조건부 수긍(concede)을 고를 수 있다. 일부만 납득했거나 아직 설득되지 않았다면 counter 또는 linger를 고른다. ask는 고를 수 없다. 이전 마디에서 이미 수긍한 것처럼 말하지 말고, 방금 말까지 포함해 판단한다. 실제로 고른 방식을 move에 기록한다."
       : move === null
@@ -215,8 +218,8 @@ export function buildFactsPrompt(state: GameState, playerText: string): { system
 - text는 누가 무엇을 하는지 드러나는 완결된 한 문장이다. 예: "${name}가 늦을 땐 먼저 한마디 하겠다", "플레이어가 무시라고 단정하지 않겠다". 말 조각을 그대로 옮기지 않는다.
 - kind: commitment(앞으로 자기가 하겠다는 행동, "~할게") · proposal(둘이 같이 하자는 방법) · concern(서운함·걱정·억울함, 상대가 알아주길 바라는 것) · request(상대에게 바라는 행동, "~해줬으면 좋겠어") · limit(할 수 없다고 밝힌 것). "~했으면 좋았겠다" 같은 후회·인정은 약속이 아니다.
 - issue: read-gap(읽고도 답이 없었던 시간) · intent-trust(일부러 그랬는지·무시했는지에 대한 믿음) · availability(일할 때 연락할 수 있는 정도) · repair-method(앞으로 어떻게 할지).
-- npcLast: 직전 ${name}의 말에서 **새로** 생긴 항목. 장부에 이미 있는 내용이면 넣지 않는다.${first ? " 이번은 첫 마디라 비워 둔다." : ""}
-- npcResolved: 직전 ${name}의 말이 플레이어의 열린 항목을 받아들였거나(accepted) 분명히 거절했으면(rejected).${first ? " 이번은 첫 마디라 비워 둔다." : ""}
+- npcLast: 직전 ${name}의 말에서 **새로** 생긴 항목. 장부에 이미 있는 내용이면 넣지 않는다. 첫 마디에는 비워 둔다.
+- npcResolved: 직전 ${name}의 말이 플레이어의 열린 항목을 받아들였거나(accepted) 분명히 거절했으면(rejected). 첫 마디에는 비워 둔다.
 - playerNew: 이번 플레이어 말에서 새로 생긴 항목.
 - playerResolved: 이번 플레이어 말이 ${name}의 열린 항목의 **내용 자체**를 받아들였거나(accepted) 거절했으면(rejected), 플레이어 자신의 열린 항목을 거둬들였으면(closed). id는 장부의 L번호 또는 이번 npcLast 순서대로 N1·N2·N3. quote는 받아들임·거절이 드러난 부분이다. 플레이어가 자기 행동을 약속한 것("조심할게")은 ${name}의 항목을 받아들인 것이 아니다(그건 playerNew의 commitment). 한 항목을 받아들였다고 다른 항목까지 닫지 않는다.
 - acts: 이번 플레이어 말이 하는 일 1~3개. refersTo는 그 행위가 가리키는 장부 id, 없으면 "".
@@ -226,14 +229,14 @@ export function buildFactsPrompt(state: GameState, playerText: string): { system
 # 장면 사실
 ${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}
 
-# 대화 장부 (지금까지)
-${ledgerLines(state.ledger, "neutral")}
-
 ${rubricFor(partner)}
 평가는 ${name}의 입장에서 한다. ${name}가 아직 지키는 입장은 장부의 열린 NPC 항목이다.
 
+# 대화 장부 (지금까지)
+${ledgerLines(state.ledger, "neutral")}
+
 # 이번 마디의 위치
-${finalTurn ? "마지막 마디다." : `${state.turns.length + 1}번째 마디다 (전체 5마디).`}`;
+${first ? "첫 마디다 (npcLast·npcResolved는 비운다)." : finalTurn ? "마지막 마디다." : `${state.turns.length + 1}번째 마디다 (전체 5마디).`}`;
   const user = `# 지금까지의 대화
 ${conversationLines(state).map((l) => l.replace("- 너 (", `- ${name} (`)).join("\n")}
 
