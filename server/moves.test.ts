@@ -1,6 +1,6 @@
 // 윤재가 대화를 끌고 가지 않도록: 끝맺음 방식은 서버가 정하고 출력이 지켰는지 검사한다.
 import { describe, expect, it } from "vitest";
-import { buildNpcPrompt, moveViolation, parseNpcOutput } from "./npc.js";
+import { buildNpcPrompt, moveViolation, parseNpcOutput, replyRepetitionViolation } from "./npc.js";
 import { chooseMove, isFinalTurn, newGame, recordTurn, RULES, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
 
 const step = (s: GameState, suggested: number, labels: StrategyLabel[] = ["emotion"], player = "말"): GameState =>
@@ -53,6 +53,7 @@ describe("끝맺음 방식 고르기", () => {
     const p = buildNpcPrompt(newGame("x", Date.now(), false), "안녕", "counter");
     expect(p.system).toContain("반론:");
     expect(p.system).toContain("먼저 제안하지 않는다");
+    expect(p.system).toContain("직전 응답과 반복 금지");
     expect(p.system).not.toContain("마지막 beat는 플레이어가 대답할 수 있게");
   });
 
@@ -89,5 +90,18 @@ describe("끝맺음 검사", () => {
     const raw = { beats: [d("넌 어떻게 생각해?")], thought: "궁금하네" };
     expect(() => parseNpcOutput(raw, "counter", true)).toThrow(/move_violation/);
     expect(parseNpcOutput(raw, "counter", false).move).toBe("counter");
+  });
+  it("직전 대사를 뜻만 바꿔 되풀이하면 재생성 대상으로 거부한다", () => {
+    const d = (content: string) => ({ type: "dialogue" as const, content });
+    let state = newGame("repeat", Date.now(), false);
+    state = recordTurn(state, {
+      player: "늦으면 미리 말해줘.",
+      npc: [d("그래, 그건 고맙다. 나도 늦을 것 같으면 미리 한마디는 해둘게. 대신 일할 때 바로바로 답 못 하는 건 그대로야. 그건 좀 봐줘.")],
+      move: "counter",
+      suggested: 5,
+      labels: ["emotion"],
+    });
+    expect(replyRepetitionViolation(state, [d("그래, 고맙다. 나도 늦을 땐 미리 한마디 해둘게. 대신 일할 때 바로 답하는 건 여전히 어렵다. 그건 좀 봐줘.")])).toBe("reply_repeats_previous");
+    expect(replyRepetitionViolation(state, [d("응. 그 말은 고맙네."), { type: "narration", content: "윤재가 컵을 조용히 만지작거린다." }])).toBeNull();
   });
 });

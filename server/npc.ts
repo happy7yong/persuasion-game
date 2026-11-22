@@ -104,6 +104,33 @@ export function parseNpcOutput(raw: unknown, move: NpcMove = "counter", strict =
   };
 }
 
+/**
+ * 바로 직전 NPC 대사를 뜻만 바꿔 되풀이하는 출력을 막는다.
+ * 모델의 의미 판단을 완전히 대체할 수는 없으므로, 한국어 음절 2-gram이 크게 겹치는
+ * 명백한 재진술만 거부한다. 프롬프트의 진행 지시와 함께 쓰는 안전망이다.
+ */
+export function replyRepetitionViolation(state: GameState, beats: { type: string; content: string }[]): string | null {
+  const previous = state.turns.at(-1)?.npc
+    .filter((beat) => beat.type === "dialogue")
+    .map((beat) => beat.content)
+    .join(" ") ?? "";
+  const candidate = beats
+    .filter((beat) => beat.type === "dialogue")
+    .map((beat) => beat.content)
+    .join(" ");
+  const a = normalizedBigrams(previous);
+  const b = normalizedBigrams(candidate);
+  if (a.size < 18 || b.size < 18) return null;
+  let shared = 0;
+  for (const token of a) if (b.has(token)) shared++;
+  return (2 * shared) / (a.size + b.size) >= 0.6 ? "reply_repeats_previous" : null;
+}
+
+function normalizedBigrams(text: string): Set<string> {
+  const compact = text.toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]/gu, "");
+  return new Set(Array.from({ length: Math.max(0, compact.length - 1) }, (_, i) => compact.slice(i, i + 2)));
+}
+
 export function buildNpcPrompt(
   state: GameState,
   playerText: string,
@@ -119,6 +146,7 @@ export function buildNpcPrompt(
     `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
     `# 이번 세션의 현재 마음과 관계 상태\n${sessionStateText(state)}\n이 상태는 이 판에서만 이어지는 실제 판단의 재료다. Core를 덮어쓰지 않는다. 이미 인정한 사실을 처음 깨달은 것처럼 반복하지 말고, 아직 유지하는 입장과 미해결 쟁점을 이어서 다룬다.`,
+    "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.",
     frame
       ? `# 이번 턴 관계 해석 (대사 전에 확정됨)\n- 플레이어의 요청: ${frame.request}\n- 플레이어가 밝힌 이유·감정: ${frame.reason}\n- 네가 인정할 수 있는 사실: ${frame.acknowledge}\n- 네가 아직 유지하는 입장: ${frame.retain}\n- 이번 대사의 초점: ${frame.focus}\n이 해석의 행위자·횟수·시간 범위를 바꾸지 않는다. 대사는 이 초점 하나에 반응하고, 해석에 없는 약속·사실·요구를 만들지 않는다.`
       : null,
@@ -213,7 +241,7 @@ function beatLine(b: { type: string; content: string }) {
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "turn-state@1";
+export const NPC_PROMPT_VERSION = "turn-state@2";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
@@ -262,8 +290,12 @@ export async function npcReply(state: GameState, playerText: string): Promise<Np
   const move = state.turns.length === 0 || finalTurn ? null : chooseMove(state);
   const prompt = buildNpcPrompt(state, playerText, move, frameResult.value);
   // 첫·마지막 마디는 모델이 형식 안에서 방식을 고른다. 마지막 시도는 형식만 본다.
-  const parse = (json: unknown, a: { last: boolean }) =>
-    parseNpcOutput(json, move ?? (finalTurn ? finalReplyMove : firstReplyMove).parse(json).move, !a.last);
+  const parse = (json: unknown, a: { last: boolean }) => {
+    const reply = parseNpcOutput(json, move ?? (finalTurn ? finalReplyMove : firstReplyMove).parse(json).move, !a.last);
+    const repetition = replyRepetitionViolation(state, reply.beats);
+    if (repetition) throw new Error(repetition);
+    return reply;
+  };
   const res = await callWithRetry(
     cfg,
     { ...prompt, schemaName: "npc_turn", schema: move === null ? (finalTurn ? finalReplySchema : firstReplySchema) : NPC_JSON_SCHEMA },
