@@ -73,12 +73,12 @@ export function BeliefCard({ token, npcName, preview = false }: { token: string;
             {state.belief.points.map((p, i) => (
               <li key={i}>
                 <p className="belief-suggestion"><span>다음에 말해보기</span>{p.suggestion}</p>
-                <p className="belief-claim">좋았던 점 · {p.strength}</p>
+                <p className="belief-claim">좋았던 점: {p.strength}</p>
                 <button className="evidence" onClick={() => goToTurn(p.turn)} aria-label={`근거: ${p.turn}번째 말로 이동`}>
-                  <span className="evidence-label">근거 · {p.turn}번째 말</span>
+                  <span className="evidence-label">근거: {p.turn}번째 말</span>
                   <span className="evidence-quote">“{p.quote}”</span>
                 </button>
-                <p className="belief-why">보완할 점 · {p.improve}</p>
+                <p className="belief-why">보완할 점: {p.improve}</p>
               </li>
             ))}
           </ol>

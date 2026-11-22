@@ -262,6 +262,24 @@ async function bestShake(): Promise<number | null> {
   }
 }
 
+/**
+ * 끝난 판들의 움직인 % 분포. 길이 101 배열(인덱스 = %, 값 = 판 수).
+ * DB 뷰 shake_distribution이 묶어서 세므로 판이 늘어도 최대 101줄만 받는다. 뷰가 없거나 실패하면 null.
+ */
+export async function distribution(): Promise<number[] | null> {
+  if (!storeEnabled()) return null;
+  try {
+    const res = await rest("shake_distribution?select=shake,n", { method: "GET" });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { shake: number; n: number }[];
+    const counts = new Array<number>(101).fill(0);
+    for (const r of rows) if (Number.isInteger(r.shake) && r.shake >= 0 && r.shake <= 100) counts[r.shake] = r.n;
+    return counts;
+  } catch {
+    return null;
+  }
+}
+
 export async function stats(): Promise<{ finished: number; persuaded: number; total: number; best: number | null } | null> {
   if (!storeEnabled()) return null;
   const [total, finished, persuaded, best] = await Promise.all([count("id=not.is.null"), count("finished_at=not.is.null"), count("outcome=eq.success"), bestShake()]);

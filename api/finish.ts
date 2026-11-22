@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fail, guarded, parseRequest, send } from "../server/http.js";
 import { buildReport } from "../server/report.js";
 import { finish } from "../server/rules.js";
-import { finishPlay, listTurns, playFinished, stats } from "../server/store.js";
+import { distribution, finishPlay, listTurns, playFinished, stats } from "../server/store.js";
 import { catchUp } from "../server/sync.js";
 import { decodeState, encodeState } from "../server/token.js";
 
@@ -38,5 +38,7 @@ export default guarded(async (req, res) => {
       console.warn("[finish] store failed", state.id, e instanceof Error ? e.message : "");
     }
   }
-  send(res, 200, { token: encodeState(state), report, stats: await stats() });
+  // 분포는 판이 끝날 때 한 번만 읽는다 (내 판이 저장된 뒤라 나도 포함된다). 결과 화면은 이 값을 저장해 두고 다시 묻지 않는다.
+  const [s, dist] = await Promise.all([stats(), distribution()]);
+  send(res, 200, { token: encodeState(state), report, stats: s ? { ...s, distribution: dist } : null });
 });

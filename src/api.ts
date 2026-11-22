@@ -70,6 +70,8 @@ export interface Stats {
   persuaded: number;
   /** 지금까지 가장 많이 흔든 기록(%) */
   best: number | null;
+  /** 결과 화면에서만: 끝난 판들의 움직인 % 분포 (길이 101, 인덱스 = %, 값 = 판 수) */
+  distribution?: number[] | null;
 }
 
 /** 서버 오류 형식 { error: { code, message, retryable } } (relationship-engine api.md §2.4) */

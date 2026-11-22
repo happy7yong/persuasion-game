@@ -45,7 +45,7 @@ export function HeadlineCard({ token }: { token: string }) {
 
       {state.kind === "loading" && (
         <div className="paper paper-loading" role="status">
-          <div className="paper-mast">은하 연합 타임스 · 3026년 특별판</div>
+          <div className="paper-mast">은하 연합 타임스 3026년 특별판</div>
           <p>
             <span className="spinner small" aria-hidden="true" />
             1,000년 뒤 신문을 인쇄하는 중…
@@ -64,7 +64,7 @@ export function HeadlineCard({ token }: { token: string }) {
 
       {state.kind === "ready" && (
         <article className="paper">
-          <div className="paper-mast">은하 연합 타임스 · 3026년 특별판</div>
+          <div className="paper-mast">은하 연합 타임스 3026년 특별판</div>
           <h2 className="paper-title">{state.headline.title}</h2>
           <p className="paper-sub">{state.headline.subtitle}</p>
           <button className="paper-quote" onClick={() => goToTurn(state.headline.quoteTurn)} aria-label={`${state.headline.quoteTurn}번째 말로 이동`}>

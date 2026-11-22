@@ -103,5 +103,15 @@ alter table turns add column if not exists state_frame jsonb;
 
 create unique index if not exists turns_play_idx_unique on turns(play_id, idx);
 
+-- 결과 화면의 "다른 사람들은 몇 % 움직였나" 분포. 끝난 판을 움직인 %(0~100)별로 센다 (최대 101줄).
+-- 한 마디도 하지 않고 포기한 판은 뺀다. 100은 RULES.startScore (server/rules.ts).
+create or replace view shake_distribution as
+select greatest(0, least(100, 100 - final_score)) as shake, count(*)::int as n
+from plays
+where finished_at is not null and final_score is not null and coalesce(turns_count, 0) > 0
+group by 1;
+revoke all on shake_distribution from anon, authenticated;
+grant select on shake_distribution to service_role;
+
 -- PostgREST가 새 컬럼을 바로 알도록 스키마 캐시를 다시 읽게 한다
 notify pgrst, 'reload schema';
