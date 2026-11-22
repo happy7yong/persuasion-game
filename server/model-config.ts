@@ -25,7 +25,8 @@ export function modelConfig(call: CallType): CallModelConfig {
   // 대사 전 해석 단계. 짧은 구조화 작업이므로 지연·비용을 작게 고정한다.
   if (call === "turn_frame") {
     return {
-      model: process.env.NPC_MODEL || "openai/gpt-5.4-mini",
+      // 상태 판정은 짧은 구조화 작업이므로 비용 효율 모델을 유지한다.
+      model: process.env.FRAME_MODEL || process.env.NPC_MODEL || "openai/gpt-5.4-mini",
       // 상태 변경안까지 함께 반환하므로 기존 관계 해석보다 여유가 필요하다.
       maxTokens: 500,
       timeoutMs: 8_000,
@@ -37,7 +38,8 @@ export function modelConfig(call: CallType): CallModelConfig {
   }
   if (call === "npc_turn") {
     return {
-      model: process.env.NPC_MODEL || "openai/gpt-5.4-mini",
+      // 실제 대사는 자연스러운 말투가 중요하므로 별도 모델을 쓴다.
+      model: process.env.NPC_DIALOGUE_MODEL || process.env.NPC_MODEL || "openai/gpt-5.6-terra",
       maxTokens: 700,
       timeoutMs: 21_000,
       budgetMs: 43_000,

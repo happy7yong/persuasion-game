@@ -57,7 +57,7 @@ npm run tone          # 정해 둔 첫마디 5개에 대한 대답을 한 번에
 ## 배포 (Vercel)
 
 1. Vercel에서 이 레포를 Import. Framework는 Vite로 자동 인식된다.
-2. Environment Variables에 `SESSION_SECRET`(16자 이상 랜덤), `OPENROUTER_API_KEY`를 넣는다. 모델을 바꾸려면 `NPC_MODEL`.
+2. Environment Variables에 `SESSION_SECRET`(16자 이상 랜덤), `OPENROUTER_API_KEY`를 넣는다. 기본값은 상태 판정 `FRAME_MODEL=openai/gpt-5.4-mini`, NPC 대사 `NPC_DIALOGUE_MODEL=openai/gpt-5.6-terra`다. 각각 바꿀 수 있으며, 기존 `NPC_MODEL`을 지정하면 두 호출에 같은 모델을 쓴다.
 3. 로그를 모으려면 Supabase SQL Editor에서 `supabase/schema.sql`을 실행하고 (테이블 `plays`, `turns`, `llm_calls`) `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MAX_TOTAL_PLAYS`를 넣는다. 이걸 연결해야 시작 화면의 "몇 명 중 몇 명이 설득했어요"가 보이고, 같은 토큰으로 마디를 다시 보내거나 엔딩을 반복 생성하는 것도 막힌다.
 4. OpenRouter 콘솔에서 크레딧 한도를 걸어 두면 비용 사고를 막을 수 있다.
 5. 선택: [Microsoft Clarity](https://clarity.microsoft.com)에서 프로젝트를 만들고 ID를 `VITE_CLARITY_ID`에 넣은 뒤 다시 배포한다. 대시보드의 Live users에서 접속 중인 참가자를 실시간으로 보고, 녹화를 볼 수 있다. 녹화는 `play_id` 태그로 Supabase `plays.id`와 맞춰 볼 수 있고, 결과(`outcome`, `shake`)와 이벤트(`turn_sent`, `ending_shown`, `error_*` 등)로 거를 수 있다. 채팅 말풍선은 녹화에 보이게 해 두었고(`data-clarity-unmask`), 입력창에 치는 중인 글자는 Clarity가 항상 가린다.

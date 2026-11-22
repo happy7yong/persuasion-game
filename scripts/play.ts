@@ -16,6 +16,7 @@ loadEnv();
 
 const { scenarioFor, PARTNERS } = await import("../server/content.js");
 const { npcReply, buildNpcPrompt, NPC_PROMPT_VERSION } = await import("../server/npc.js");
+const { modelConfig } = await import("../server/model-config.js");
 const { checkMessage, chooseMove, newGame, recordTurn, finish, RULES, shakePercent } = await import("../server/rules.js");
 const { buildReport } = await import("../server/report.js");
 const { writeBelief } = await import("../server/belief.js");
@@ -40,7 +41,7 @@ const showState = (s: typeof state) => {
 const partner = process.argv[2] === "f" ? "f" : "m";
 const name = PARTNERS[partner].name;
 const sc = scenarioFor(partner);
-console.log(c.dim(`프롬프트 ${NPC_PROMPT_VERSION} · ${isScripted() ? "대본 모드 (키 없음)" : process.env.NPC_MODEL || "openai/gpt-5.4-mini"}`));
+console.log(c.dim(`프롬프트 ${NPC_PROMPT_VERSION} · 대사 ${isScripted() ? "대본 모드 (키 없음)" : modelConfig("npc_turn").model} · 상태 ${modelConfig("turn_frame").model}`));
 console.log(c.dim(`${sc.place} · ${name} · ${RULES.maxTurns}마디, ${RULES.charBudget}자\n`));
 show(sc.opening, name);
 

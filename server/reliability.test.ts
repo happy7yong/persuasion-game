@@ -15,6 +15,23 @@ const okBody = (content: string) =>
 const goodNpc = JSON.stringify({ beats: [{ type: "dialogue", content: "응" }], thought: "알겠어" });
 
 describe("시간 예산", () => {
+  it("상태 판정과 대사 생성의 기본 모델을 분리한다", () => {
+    const old = { npc: process.env.NPC_MODEL, frame: process.env.FRAME_MODEL, dialogue: process.env.NPC_DIALOGUE_MODEL };
+    delete process.env.NPC_MODEL;
+    delete process.env.FRAME_MODEL;
+    delete process.env.NPC_DIALOGUE_MODEL;
+    try {
+      expect(modelConfig("turn_frame").model).toBe("openai/gpt-5.4-mini");
+      expect(modelConfig("npc_turn").model).toBe("openai/gpt-5.6-terra");
+    } finally {
+      if (old.npc === undefined) delete process.env.NPC_MODEL;
+      else process.env.NPC_MODEL = old.npc;
+      if (old.frame === undefined) delete process.env.FRAME_MODEL;
+      else process.env.FRAME_MODEL = old.frame;
+      if (old.dialogue === undefined) delete process.env.NPC_DIALOGUE_MODEL;
+      else process.env.NPC_DIALOGUE_MODEL = old.dialogue;
+    }
+  });
   it("재시도까지 포함한 예산이 함수 상한 안에 들어간다", () => {
     for (const t of ["npc_turn", "belief"] as const) {
       const c = modelConfig(t);
