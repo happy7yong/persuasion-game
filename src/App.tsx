@@ -177,15 +177,13 @@ export function App() {
       </>
     );
   }
+  // 채팅 화면에는 푸터(문의)를 두지 않는다: 대화에만 집중하게, 입력바와 겹치지 않게
   return (
-    <>
-      <Chat
-        session={session}
-        update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))}
-        onRestart={restart}
-      />
-      <AppFooter />
-    </>
+    <Chat
+      session={session}
+      update={(patch) => setSession((s) => (s ? { ...s, ...patch } : s))}
+      onRestart={restart}
+    />
   );
 }
 
