@@ -102,6 +102,7 @@ describe("끝맺음 검사", () => {
       labels: ["emotion"],
     });
     expect(replyRepetitionViolation(state, [d("그래, 고맙다. 나도 늦을 땐 미리 한마디 해둘게. 대신 일할 때 바로 답하는 건 여전히 어렵다. 그건 좀 봐줘.")])).toBe("reply_repeats_previous");
+    expect(replyRepetitionViolation(state, [d("그래. 그럼 내가 늦을 것 같을 땐 미리 한마디 할게."), d("아까 그 말은, 내가 제일 열받았던 게 무시당한 거였어, 아니면 답이 늦어진 거였어?")], "응 알겠어.")).toBe("reply_repeats_previous");
     expect(replyRepetitionViolation(state, [d("응. 그 말은 고맙네."), { type: "narration", content: "윤재가 컵을 조용히 만지작거린다." }])).toBeNull();
   });
 });

@@ -109,7 +109,7 @@ export function parseNpcOutput(raw: unknown, move: NpcMove = "counter", strict =
  * 모델의 의미 판단을 완전히 대체할 수는 없으므로, 한국어 음절 2-gram이 크게 겹치는
  * 명백한 재진술만 거부한다. 프롬프트의 진행 지시와 함께 쓰는 안전망이다.
  */
-export function replyRepetitionViolation(state: GameState, beats: { type: string; content: string }[]): string | null {
+export function replyRepetitionViolation(state: GameState, beats: { type: string; content: string }[], playerText = ""): string | null {
   const previous = state.turns.at(-1)?.npc
     .filter((beat) => beat.type === "dialogue")
     .map((beat) => beat.content)
@@ -123,12 +123,33 @@ export function replyRepetitionViolation(state: GameState, beats: { type: string
   if (a.size < 18 || b.size < 18) return null;
   let shared = 0;
   for (const token of a) if (b.has(token)) shared++;
-  return (2 * shared) / (a.size + b.size) >= 0.6 ? "reply_repeats_previous" : null;
+  if ((2 * shared) / (a.size + b.size) >= 0.6) return "reply_repeats_previous";
+
+  // "응, 알겠어"처럼 새 정보 없는 수용 다음에는, 바로 전 대사의 핵심어 하나만
+  // 되풀이해도 진행이 멈춘다. 한국어 활용형(늦어질/늦을)은 2-gram으로 놓치므로
+  // 이 좁은 경우에만 단어 겹침을 추가로 본다.
+  if (isBriefAcknowledgement(playerText) && sharedContentTerm(previous, candidate)) return "reply_repeats_previous";
+  return null;
 }
 
 function normalizedBigrams(text: string): Set<string> {
   const compact = text.toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]/gu, "");
   return new Set(Array.from({ length: Math.max(0, compact.length - 1) }, (_, i) => compact.slice(i, i + 2)));
+}
+
+function isBriefAcknowledgement(text: string): boolean {
+  const compact = text.replace(/[^\p{L}\p{N}]/gu, "");
+  return /^(응|웅|어|그래|알겠어|알았어|응알겠어|그래알겠어|ㅇㅇ)$/u.test(compact);
+}
+
+function sharedContentTerm(a: string, b: string): boolean {
+  const terms = (text: string) => new Set(
+    (text.match(/[가-힣]{3,}/g) ?? [])
+      .map((word) => word.replace(/(으로|에게서|에서|부터|까지|처럼|은|는|이|가|을|를|에|의|도|만|과|와|로)$/u, ""))
+      .filter((word) => word.length >= 3 && !["그래서", "그렇게", "하지만", "그러니까", "아니었어"].includes(word)),
+  );
+  const left = terms(a);
+  return [...terms(b)].some((word) => left.has(word));
 }
 
 export function buildNpcPrompt(
@@ -292,7 +313,7 @@ export async function npcReply(state: GameState, playerText: string): Promise<Np
   // 첫·마지막 마디는 모델이 형식 안에서 방식을 고른다. 마지막 시도는 형식만 본다.
   const parse = (json: unknown, a: { last: boolean }) => {
     const reply = parseNpcOutput(json, move ?? (finalTurn ? finalReplyMove : firstReplyMove).parse(json).move, !a.last);
-    const repetition = replyRepetitionViolation(state, reply.beats);
+    const repetition = replyRepetitionViolation(state, reply.beats, playerText);
     if (repetition) throw new Error(repetition);
     return reply;
   };
