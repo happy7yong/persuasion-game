@@ -21,6 +21,20 @@ export interface CallModelConfig {
 
 export const FUNCTION_MAX_DURATION_MS = 60_000;
 
+/** 배포 환경의 대사 모델 기본값 (main과 같다). */
+export const PRODUCTION_DIALOGUE_MODEL = "openai/gpt-5.6-terra";
+/** 로컬 개발·평가의 기본 모델 (docs/dialogue-architecture.md §14.12). */
+export const DEV_MODEL = "openai/gpt-5.4-mini";
+
+/**
+ * 로컬 개발 서버와 scripts/(eval·play·tone)에서만 부른다. 배포 함수는 부르지 않는다.
+ * 모델 환경 변수가 비어 있으면 Mini를 넣는다. 이미 정한 값(예: Terra 비교 실행)은 그대로 둔다.
+ */
+export function applyDevModelDefaults(env: Record<string, string | undefined> = process.env): void {
+  env.NPC_MODEL ||= DEV_MODEL;
+  env.NPC_DIALOGUE_MODEL ||= env.NPC_MODEL;
+}
+
 export function modelConfig(call: CallType): CallModelConfig {
   // 대사 전 해석 단계. 짧은 구조화 작업이므로 지연·비용을 작게 고정한다.
   if (call === "turn_frame") {
@@ -50,9 +64,9 @@ export function modelConfig(call: CallType): CallModelConfig {
   }
   if (call === "npc_turn") {
     return {
-      // 실제 대사 모델. NPC_DIALOGUE_MODEL로 따로 바꿀 수 있다 (예: openai/gpt-5.6-terra, 호출당 비용 약 5배).
-      // 구조 재설계 중에는 비용을 줄이려고 기본값을 mini로 둔다 (docs/dialogue-architecture.md).
-      model: process.env.NPC_DIALOGUE_MODEL || process.env.NPC_MODEL || "openai/gpt-5.4-mini",
+      // 실제 대사 모델. 기본값은 배포와 같은 Terra다 (이 값을 바꾸면 배포 모델이 바뀐다).
+      // 로컬 개발·평가는 applyDevModelDefaults로 Mini를 쓴다 (docs/dialogue-architecture.md §14.12).
+      model: process.env.NPC_DIALOGUE_MODEL || process.env.NPC_MODEL || PRODUCTION_DIALOGUE_MODEL,
       maxTokens: 700,
       timeoutMs: 21_000,
       budgetMs: 43_000,

@@ -45,7 +45,7 @@ const B = await import("./eval/budget.js");
 const RJ = await import("./eval/rejudge.js");
 
 type GameState = ReturnType<typeof newGame>;
-type Attempt = { usage: { promptTokens: number | null; completionTokens: number | null; cachedTokens?: number | null; cost: number | null } | null; latencyMs: number; result: string; responseText: string | null };
+type Attempt = { usage: { promptTokens: number | null; completionTokens: number | null; cachedTokens?: number | null; cost: number | null } | null; latencyMs: number; result: string; responseText: string | null; respondedModel?: string | null };
 
 // ------------------------------------------------------------------ 인자
 
@@ -78,7 +78,7 @@ const EST = B.estimatesFor(MODELS);
 const TURN = B.turnEstimate(EST);
 let budget = new B.Budget(Infinity, EST); // 계획을 세운 뒤 실제 상한으로 바꾼다
 
-const cost = { calls: 0, input: 0, cached: 0, output: 0, usd: 0, byType: {} as Record<string, { calls: number; usd: number; input: number; cached: number }> };
+const cost = { calls: 0, input: 0, cached: 0, output: 0, usd: 0, byType: {} as Record<string, { calls: number; usd: number; input: number; cached: number; responded: Record<string, number> }> };
 function account(type: "turn_frame" | "npc_turn" | "scene_check", attempts: readonly Attempt[]) {
   budget.record(type, attempts);
   for (const a of attempts) {
@@ -88,8 +88,11 @@ function account(type: "turn_frame" | "npc_turn" | "scene_check", attempts: read
     cost.cached += u?.cachedTokens ?? 0;
     cost.output += u?.completionTokens ?? 0;
     cost.usd += u?.cost ?? 0;
-    const t = (cost.byType[type] ??= { calls: 0, usd: 0, input: 0, cached: 0 });
+    const t = (cost.byType[type] ??= { calls: 0, usd: 0, input: 0, cached: 0, responded: {} });
     t.calls++;
+    // 설정한 모델(meta.models)과 따로, 공급자가 실제로 응답한 모델을 센다 (기준선과 비교 조건 확인용)
+    const m = a.respondedModel ?? "(응답 없음)";
+    t.responded[m] = (t.responded[m] ?? 0) + 1;
     t.usd += u?.cost ?? 0;
     t.input += u?.promptTokens ?? 0;
     t.cached += u?.cachedTokens ?? 0;
@@ -756,7 +759,13 @@ try {
     `- 호출 ${cost.calls}회 · 입력 ${cost.input} (캐시 ${cost.cached}, ${pct(cost.cached, cost.input)}) · 출력 ${cost.output} · **$${cost.usd.toFixed(4)}** (예상 $${plan.expectedUsd.toFixed(4)}, 상한 $${maxUsd.toFixed(4)}) · ${((Date.now() - started) / 1000).toFixed(0)}초`,
     ...(budget.missingCost ? [`- 비용 정보 없이 끝난 호출 ${budget.missingCost}회는 예상 비용으로 셌다`] : []),
   );
-  for (const [k, v] of Object.entries(cost.byType)) md.push(`- ${k}: ${v.calls}회 · $${v.usd.toFixed(4)} · 입력 ${v.input} (캐시 ${pct(v.cached, v.input)})`);
+  for (const [k, v] of Object.entries(cost.byType)) {
+    const configured = MODELS[k as keyof typeof MODELS];
+    const responded = Object.entries(v.responded).map(([m, n]) => `${m}×${n}`).join(", ");
+    // 공급자는 날짜가 붙은 이름으로 답할 수 있어 앞부분만 비교한다
+    const mismatch = Object.keys(v.responded).some((m) => m !== "(응답 없음)" && !m.startsWith(configured));
+    md.push(`- ${k}: ${v.calls}회 · $${v.usd.toFixed(4)} · 입력 ${v.input} (캐시 ${pct(v.cached, v.input)}) · 설정 ${configured} · 실제 응답 ${responded}${mismatch ? " ⚠️ 설정과 다름" : ""}`);
+  }
   md.push("");
   json.cost = { ...cost, budgetSpent: budget.spent };
   writeFileSync(`${outDir}/summary.md`, md.join("\n"));
