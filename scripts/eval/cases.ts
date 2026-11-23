@@ -153,22 +153,42 @@ export interface SceneCase {
   player: string;
   line: string;
   expect: "contradiction" | "ok";
+  /** real: 실제 대화에서 나온 대사(사람 검토로 분류) · design: 설계 때 정한 대표 사례 · synthetic: 거름망 미탐을 보려고 만든 사례 */
+  source: "real" | "design" | "synthetic";
   note?: string;
 }
 
+/** 서아 판 3마디: 플레이어가 떨어져 있는 사람에게 하듯 말해 장면 이탈을 강하게 유도하는 입력 */
+const PICKUP = "바쁘다고 하니까 기다린다고 한거지 언제 끝나?데리러 갈게";
+
 export const SCENE_CASES: SceneCase[] = [
-  { player: "언제 끝나? 데리러 갈게", line: "곧 끝나. 데리러 오는 건 괜찮아, 여기서 기다리면 돼.", expect: "contradiction", note: "리플레이에서 실제로 나온 이탈" },
-  { player: "언제 끝나?", line: "나 아직 한두 시간은 더 걸릴 것 같아.", expect: "contradiction" },
-  { player: "보고 싶다", line: "일 끝나면 바로 너한테 갈게.", expect: "contradiction" },
-  { player: "지금 뭐 해?", line: "지금 집에서 전화받고 있어.", expect: "contradiction" },
-  { player: "언제 와?", line: "오늘 야근이라 늦을 것 같아.", expect: "contradiction" },
-  { player: "언제 끝나?", line: "나 아직 자리라서 조금만 기다려 줘.", expect: "contradiction", note: "거름망 밖일 수 있음 (미탐 확인용)" },
-  { player: "어디야?", line: "아직 팀장님이랑 있어.", expect: "contradiction", note: "거름망 밖일 수 있음 (미탐 확인용)" },
-  { player: "왜 이렇게 늦었어", line: "아까 회의 끝나고 바로 왔어.", expect: "ok", note: "과거 회상" },
-  { player: "언제 끝나? 데리러 갈게", line: "뭘 데리러 와. 나 지금 네 앞에 있잖아.", expect: "ok", note: "장면 정정" },
-  { player: "배고프다", line: "이거 마시고 밥 먹으러 가자.", expect: "ok", note: "지금 대화 뒤에 함께 할 일" },
-  { player: "다음엔 어떻게 할 거야", line: "다음엔 회의 끝나면 바로 연락할게.", expect: "ok", note: "앞으로의 습관" },
-  { player: "먹고 싶었던 카페 갈까?", line: "응, 가자. 오늘은 거기서 먹자.", expect: "ok", note: "리플레이에서 판정이 정상 처리" },
+  // 실제 대화에서 나온 장면 이탈 (기준선 2026-11-22 사람 검토: 막는 게 맞음)
+  { player: PICKUP, line: "나 아직 한두 시간은 더 걸릴 것 같아.", expect: "contradiction", source: "real", note: "원래 판 b46999f5. 기준선에서 거름망 미탐" },
+  { player: PICKUP, line: "곧 끝나. 데리러 오는 건 괜찮아, 여기서 기다리면 돼.", expect: "contradiction", source: "real" },
+  { player: PICKUP, line: "그럼 데리러 오는 건 알겠고, 난 지금 좀 정리하고 나갈게. 끝나는 시간은 아직 딱 못 박긴 어려워.", expect: "contradiction", source: "real" },
+  { player: PICKUP, line: "오늘은 이제 끝났어. 데리러 오는 건 괜찮아, 대신 너무 서두르진 마.", expect: "contradiction", source: "real", note: "데리러 오는 걸 받아들임" },
+  { player: PICKUP, line: "오늘은 좀 늦어. 몇 시 딱 잘라 말하긴 어렵고, 네가 데리러 올 거면 내가 끝나고 연락할게.", expect: "contradiction", source: "real" },
+  { player: PICKUP, line: "아직 정확한 시간은 못 박긴 어렵고, 그냥 오늘은 끝났어. 데리러 오는 건… 오면 같이 가자.", expect: "contradiction", source: "real" },
+  { player: PICKUP, line: "내가 언제 끝날지는 아직 딱 안 잡혀서, 데리러 오는 건 괜찮아도 너무 맞춰 오진 말고.", expect: "contradiction", source: "real" },
+  { player: PICKUP, line: "응, 오늘은 끝났어. 데리러 오는 건 괜찮고, 이렇게 같이 있어.", expect: "contradiction", source: "real", note: "기준선에서 노출된 유일한 실제 이탈. 정정과 수락이 섞임" },
+  { player: "알았어 기다릴게", line: "그래, 고마워. 끝나고 보자.", expect: "contradiction", source: "real" },
+  // 실제 대화에서 나온 정상 대사 (기준선에서 V3가 잘못 막음 = 오탐)
+  { player: PICKUP, line: "지금 마주 앉아 있는데 데리러 올 건 아니고, 그냥 여기 있어. 오늘은 뭐가 제일 서운했어?", expect: "ok", source: "real", note: "기준선 오탐 (노출로 집계됐던 정상 대사)" },
+  { player: PICKUP, line: "이미 여기 와 있잖아. 데리러 올 건 아니고, 나중에 같이 들어가면 돼. 끝나는 건 지금이야. 네가 기다린다고 한 건 알겠어.", expect: "ok", source: "real", note: "기준선 오탐" },
+  { player: PICKUP, line: "응, 그건 고마워. 근데 데리러 오는 건 지금은 아니고, 아까 네가 왜 그렇게 서운했는지가 더 궁금해. 뭐가 제일 걸렸어?", expect: "ok", source: "real", note: "기준선 오탐" },
+  { player: "먹고 가고싶어했던 카페 갈까?", line: "그래, 여기서 먹고 가자. 나 아직 앉아 있는 게 편해.", expect: "ok", source: "real", note: "기준선 오탐" },
+  { player: "먹고 가고싶어했던 카페 갈까?", line: "응, 가자. 오늘은 거기서 먹자.", expect: "ok", source: "real", note: "기준선에서 정상 처리" },
+  // 설계 때 정한 대표 사례
+  { player: "보고 싶다", line: "일 끝나면 바로 너한테 갈게.", expect: "contradiction", source: "design" },
+  { player: "지금 뭐 해?", line: "지금 집에서 전화받고 있어.", expect: "contradiction", source: "design" },
+  { player: "언제 와?", line: "오늘 야근이라 늦을 것 같아.", expect: "contradiction", source: "design" },
+  { player: "왜 이렇게 늦었어", line: "아까 회의 끝나고 바로 왔어.", expect: "ok", source: "design", note: "과거 회상" },
+  { player: "언제 끝나? 데리러 갈게", line: "뭘 데리러 와. 나 지금 네 앞에 있잖아.", expect: "ok", source: "design", note: "장면 정정" },
+  { player: "배고프다", line: "이거 마시고 밥 먹으러 가자.", expect: "ok", source: "design", note: "지금 대화 뒤에 함께 할 일" },
+  { player: "다음엔 어떻게 할 거야", line: "다음엔 회의 끝나면 바로 연락할게.", expect: "ok", source: "design", note: "앞으로의 습관" },
+  // 거름망 미탐을 보려고 만든 사례 (키워드를 계속 늘려 쫓지 않는다. 몇 개를 놓치는지 기록만 한다)
+  { player: "언제 끝나?", line: "나 아직 자리라서 조금만 기다려 줘.", expect: "contradiction", source: "synthetic" },
+  { player: "어디야?", line: "아직 팀장님이랑 있어.", expect: "contradiction", source: "synthetic" },
 ];
 
 // ------------------------------------------------------------------ V1 반복 검사 (LLM 없음)
