@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { BAND_GUIDE, COMMON_PRINCIPLES, coreFor, DIALOGUE_PRIORITIES, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, PARTNERS, rubricFor, SCENARIO, sceneFactsFor, scenarioFor } from "./content.js";
+import { APPRAISAL_OUTPUT_FORMAT, APPRAISAL_PRIORITIES, BAND_GUIDE, COMMON_PRINCIPLES, coreFor, DIALOGUE_PRIORITIES, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, PARTNERS, rubricFor, SCENARIO, sceneFactsFor, scenarioFor } from "./content.js";
 import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
 import { modelConfig } from "./model-config.js";
 import { buildSceneCheckPrompt, checkOutcome, parseSceneVerdict, reassertViolation, REF_USES, SCENE_JSON_SCHEMA, sceneTriggers, type AttemptCheck, type CheckOutcome, type Ref } from "./checks.js";
-import { factsLines, ISSUE_IDS, LEDGER_KINDS, ledgerLines, PLAYER_ACTS, applyFacts, resolveFacts, type TurnFacts } from "./ledger.js";
+import { factsLines, ISSUE_IDS, LEDGER_KINDS, ledgerLines, PLAYER_ACTS, applyFacts, resolveFacts, spokenLines, type LedgerItem, type TurnFacts } from "./ledger.js";
 import { band, chooseMove, isFinalTurn, STRATEGY_LABELS, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
 
 const BeatSchema = z.object({
@@ -72,7 +72,7 @@ export function parseFacts(state: GameState, playerText: string, raw: unknown, s
   return { ...facts, evaluation: { ...facts.evaluation, labels: isLabelList(facts.evaluation.labels) } };
 }
 
-const ENDS_WITH_QUESTION = /[?？]\s*[)"”’…~.]*\s*$/u;
+export const ENDS_WITH_QUESTION = /[?？]\s*[)"”’…~.]*\s*$/u;
 
 /** 끝맺음 방식을 지켰는지. 질문은 ask일 때만, 대사 개수 상한. 여운의 대사·행동 순서는 강제하지 않는다. 위반 사유 또는 null. */
 export function moveViolation(move: NpcMove, beats: { type: string; content: string }[]): string | null {
@@ -149,6 +149,10 @@ function sharedContentTerm(a: string, b: string): boolean {
   return [...terms(b)].some((word) => left.has(word));
 }
 
+/** 직전 응답 반복 금지 (A와 실험 B가 같은 문장을 쓴다) */
+const REPEAT_RULES =
+  "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.";
+
 export function buildNpcPrompt(
   state: GameState,
   playerText: string,
@@ -167,7 +171,7 @@ export function buildNpcPrompt(
     `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
     OUTPUT_FORMAT,
     DIALOGUE_PRIORITIES,
-    "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.",
+    REPEAT_RULES,
     // ---- 여기부터 매 마디 바뀐다
     `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
     `# 지금 마음\n${mindLine(state)}\nCore의 성향대로 이 마음이 방금 말을 어떻게 듣게 하는지는 네가 판단한다.`,
@@ -340,39 +344,62 @@ export async function npcReply(state: GameState, playerText: string): Promise<Np
     (json, a) => parseFacts(state, playerText, json, !a.last),
   );
   if (!factsResult.ok) return { ok: false, failure: factsResult.failure, attempts: [], factsAttempts: factsResult.attempts, sceneAttempts: [] };
-  const facts = factsResult.value;
-  const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
+  return replyFromFacts(state, playerText, factsResult.value, factsResult.attempts);
+}
 
+/**
+ * 한 시도의 대사를 검증한다 (V1 반복 · V2 재주장 · V3 장면 · V4 끝맺음).
+ * move가 null이면(실험 1 조건 B: 끝맺음을 정하지 않음) V4는 해당 없음이다.
+ * 기존 방식(A)과 B가 같은 검증기를 쓰도록 한 곳에 둔다.
+ */
+async function checkAttempt(
+  ctx: { state: GameState; playerText: string; ledgerAfter: readonly LedgerItem[]; sceneAttempts: AttemptRecord[] },
+  reply: { beats: { type: string; content: string }[]; refs: Ref[]; move: NpcMove | null },
+  a: { index: number; last: boolean },
+): Promise<AttemptCheck> {
+  const partner = ctx.state.partner ?? "m";
+  const violations: string[] = [];
+  if (reply.move) {
+    const mv = moveViolation(reply.move, reply.beats);
+    if (mv) violations.push(`move_violation:${mv}`);
+  }
+  const rep = replyRepetitionViolation(ctx.state, reply.beats, ctx.playerText);
+  if (rep) violations.push(rep);
+  const ra = reassertViolation(ctx.ledgerAfter, reply.refs);
+  if (ra) violations.push(ra);
+  const dialogue = reply.beats.filter((b) => b.type === "dialogue").map((b) => b.content).join(" ");
+  const triggers = sceneTriggers(dialogue);
+  let sceneVerdict: AttemptCheck["sceneVerdict"];
+  if (triggers.length) {
+    const sc = buildSceneCheckPrompt(sceneFactsFor(partner), PARTNERS[partner].name, ctx.playerText, dialogue);
+    const judged = await callWithRetry(modelConfig("scene_check"), { ...sc, schemaName: "scene_check", schema: SCENE_JSON_SCHEMA }, (j) => parseSceneVerdict(j));
+    ctx.sceneAttempts.push(...judged.attempts);
+    sceneVerdict = judged.ok ? judged.value : { verdict: "unclear", reason: `판정 실패: ${judged.failure.message}`.slice(0, 120) };
+    if (sceneVerdict.verdict === "contradiction") violations.push(`scene_contradiction:${sceneVerdict.reason}`);
+  }
+  return { attempt: a.index, last: a.last, violations, sceneTriggers: triggers, ...(sceneVerdict ? { sceneVerdict } : {}), refs: reply.refs };
+}
+
+/**
+ * 확정된 1차 결과로 대사를 만든다 (서비스 경로: npcReply가 1차 뒤에 부른다).
+ * 평가는 같은 1차 결과를 여러 조건에 쓰려고 이 함수를 바로 부른다.
+ */
+export async function replyFromFacts(state: GameState, playerText: string, facts: TurnFacts, factsAttempts: AttemptRecord[] = []): Promise<NpcResult> {
+  const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
   const cfg = modelConfig("npc_turn");
   const finalTurn = isFinalTurn(state);
   const move = state.turns.length === 0 || finalTurn ? null : chooseMove(state);
   const prompt = buildNpcPrompt(state, playerText, move, facts);
-  const partner = state.partner ?? "m";
   const checks: AttemptCheck[] = [];
   const sceneAttempts: AttemptRecord[] = [];
+  const ctx = { state, playerText, ledgerAfter, sceneAttempts };
 
-  // 검증 (V1 반복 · V2 재주장 · V3 장면 · V4 끝맺음). 첫 시도에서만 거부하고, 마지막 시도는 통과시키되 기록한다.
+  // 첫 시도에서만 거부하고, 마지막 시도는 통과시키되 기록한다.
   const parse = async (json: unknown, a: { index: number; last: boolean }) => {
     const reply = parseNpcOutput(json, move ?? (finalTurn ? finalReplyMove : firstReplyMove).parse(json).move, false);
-    const violations: string[] = [];
-    const mv = moveViolation(reply.move, reply.beats);
-    if (mv) violations.push(`move_violation:${mv}`);
-    const rep = replyRepetitionViolation(state, reply.beats, playerText);
-    if (rep) violations.push(rep);
-    const ra = reassertViolation(ledgerAfter, reply.refs);
-    if (ra) violations.push(ra);
-    const dialogue = reply.beats.filter((b) => b.type === "dialogue").map((b) => b.content).join(" ");
-    const triggers = sceneTriggers(dialogue);
-    let sceneVerdict: AttemptCheck["sceneVerdict"];
-    if (triggers.length) {
-      const sc = buildSceneCheckPrompt(sceneFactsFor(partner), PARTNERS[partner].name, playerText, dialogue);
-      const judged = await callWithRetry(modelConfig("scene_check"), { ...sc, schemaName: "scene_check", schema: SCENE_JSON_SCHEMA }, (j) => parseSceneVerdict(j));
-      sceneAttempts.push(...judged.attempts);
-      sceneVerdict = judged.ok ? judged.value : { verdict: "unclear", reason: `판정 실패: ${judged.failure.message}`.slice(0, 120) };
-      if (sceneVerdict.verdict === "contradiction") violations.push(`scene_contradiction:${sceneVerdict.reason}`);
-    }
-    checks.push({ attempt: a.index, last: a.last, violations, sceneTriggers: triggers, ...(sceneVerdict ? { sceneVerdict } : {}), refs: reply.refs });
-    if (violations.length && !a.last) throw new Error(violations.join(" | "));
+    const check = await checkAttempt(ctx, reply, a);
+    checks.push(check);
+    if (check.violations.length && !a.last) throw new Error(check.violations.join(" | "));
     return reply;
   };
   const res = await callWithRetry(
@@ -385,7 +412,7 @@ export async function npcReply(state: GameState, playerText: string): Promise<Np
     }),
     parse,
   );
-  if (!res.ok) return { ok: false, failure: res.failure, attempts: res.attempts, factsAttempts: factsResult.attempts, sceneAttempts };
+  if (!res.ok) return { ok: false, failure: res.failure, attempts: res.attempts, factsAttempts, sceneAttempts };
   const last = res.attempts.at(-1);
   return {
     ok: true,
@@ -401,7 +428,118 @@ export async function npcReply(state: GameState, playerText: string): Promise<Np
       usage: last?.usage ?? null,
     },
     attempts: res.attempts,
-    factsAttempts: factsResult.attempts,
+    factsAttempts,
+    sceneAttempts,
+  };
+}
+
+// ------------------------------------------------------------------ 실험 1 조건 B: 캐릭터 직접 해석 (docs/appraisal-review.md §14)
+// 평가(npm run eval -- appraisal)에서만 쓴다. 서비스 경로(npcReply)는 부르지 않는다.
+
+const MIND_AXES = ["fatigue", "guilt", "defensiveness", "care", "openness"] as const;
+export const AppraisalOutputSchema = z.object({
+  heard: z.string().trim().min(1).max(160),
+  // 바뀐 축만. 없으면 빈 목록 (변하지 않을 자유)
+  shift: z.array(z.object({ axis: z.enum(MIND_AXES), delta: z.union([z.literal(1), z.literal(-1)]), why: z.string().trim().max(80) })).max(5),
+  // 특별히 새로 바라는 게 없으면 ""
+  want: z.string().trim().max(120),
+  beats: z.array(BeatSchema).min(1).max(4),
+  refs: z.array(z.object({ id: z.string().trim().min(1).max(8), use: z.enum(REF_USES) })).default([]).transform((xs) => xs.slice(0, 6)),
+});
+export type AppraisalOutput = z.infer<typeof AppraisalOutputSchema>;
+
+/** 순서가 곧 생성 순서다: heard → shift → want → beats → refs */
+export const APPRAISAL_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["heard", "shift", "want", "beats", "refs"],
+  properties: {
+    heard: { type: "string" },
+    shift: {
+      type: "array",
+      items: { type: "object", additionalProperties: false, required: ["axis", "delta", "why"], properties: { axis: { type: "string", enum: [...MIND_AXES] }, delta: { type: "integer", enum: [-1, 1] }, why: { type: "string" } } },
+    },
+    want: { type: "string" },
+    beats: NPC_JSON_SCHEMA.properties.beats,
+    refs: NPC_JSON_SCHEMA.properties.refs,
+  },
+} as const;
+
+export function parseAppraisalOutput(raw: unknown): AppraisalOutput {
+  const out = AppraisalOutputSchema.parse(raw);
+  return { ...out, beats: out.beats.map((b) => ({ type: b.type, content: b.content.replace(/^["“]|["”]$/g, "") })) };
+}
+
+/**
+ * B의 프롬프트. A(buildNpcPrompt)와 다른 점:
+ * - 없음: BAND 마음 묘사, 1차의 의미 라벨(factsLines), 장부 상태어, 끝맺음(move) 지정
+ * - 바뀜: 장부 → "실제로 말해진 것"(spokenLines), 마음 → "듣기 전 마음", 우선순위 2번, 출력 형식(heard → shift → want → beats)
+ * - 같음: 규칙·공통 원칙·Core·장면·반복 금지, 대화 기록과 방금 말(user)
+ */
+export function buildAppraisalPrompt(state: GameState, playerText: string, facts: TurnFacts): { system: string; user: string } {
+  const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
+  const partner = state.partner ?? "m";
+  const system = [
+    ENGINE_RULES,
+    COMMON_PRINCIPLES,
+    coreFor(partner),
+    `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
+    APPRAISAL_OUTPUT_FORMAT,
+    APPRAISAL_PRIORITIES,
+    REPEAT_RULES,
+    // ---- 여기부터 매 마디 바뀐다
+    `# 듣기 전 네 마음\n${mindLine(state)}\n방금 플레이어의 말을 듣기 전의 마음이다. 그 말을 어떻게 받아들일지는 Core의 성향과 이 마음으로 네가 판단한다.`,
+    `# 지금까지 실제로 말해진 것 (누가 무엇을 말했나)\n${spokenLines(ledgerAfter)}`,
+  ].join("\n\n");
+  const user = `# 지금까지 네가 보고 들은 대화
+${conversationLines(state).join("\n")}
+
+# 방금 플레이어가 한 것
+- 플레이어 (말): ${playerText}
+
+# 이번 차례
+위 규칙에 따라 JSON으로 답한다.`;
+  return { system, user };
+}
+
+export interface AppraisalReply {
+  beats: { type: "narration" | "dialogue"; content: string }[];
+  heard: string;
+  shift: AppraisalOutput["shift"];
+  want: string;
+  refs: Ref[];
+  /** 생성 뒤 분류 (끝맺음을 미리 정하지 않았으므로): 마지막 대사가 질문으로 끝나는가 */
+  endsWithQuestion: boolean;
+  checks: AttemptCheck[];
+  outcome: CheckOutcome;
+}
+export type AppraisalResult = ({ ok: true; reply: AppraisalReply } | { ok: false; failure: LlmFailure }) & { attempts: AttemptRecord[]; sceneAttempts: AttemptRecord[] };
+
+/** 조건 B로 대사를 만든다. 검증기·재시도 정책은 A와 같다 (V4는 끝맺음을 정하지 않아 해당 없음). 상태는 바꾸지 않는다. */
+export async function appraisalReplyFromFacts(state: GameState, playerText: string, facts: TurnFacts): Promise<AppraisalResult> {
+  const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
+  const prompt = buildAppraisalPrompt(state, playerText, facts);
+  const checks: AttemptCheck[] = [];
+  const sceneAttempts: AttemptRecord[] = [];
+  const ctx = { state, playerText, ledgerAfter, sceneAttempts };
+  const parse = async (json: unknown, a: { index: number; last: boolean }) => {
+    const out = parseAppraisalOutput(json);
+    const check = await checkAttempt(ctx, { beats: out.beats, refs: out.refs, move: null }, a);
+    checks.push(check);
+    if (check.violations.length && !a.last) throw new Error(check.violations.join(" | "));
+    return out;
+  };
+  const res = await callWithRetry(
+    modelConfig("npc_turn"),
+    ({ lastError }) => ({ ...prompt, user: prompt.user + (lastError ? retryNote(lastError) : ""), schemaName: "npc_appraisal", schema: APPRAISAL_JSON_SCHEMA }),
+    parse,
+  );
+  if (!res.ok) return { ok: false, failure: res.failure, attempts: res.attempts, sceneAttempts };
+  const lastDialogue = res.value.beats.filter((b) => b.type === "dialogue").at(-1)?.content ?? "";
+  return {
+    ok: true,
+    reply: { ...res.value, endsWithQuestion: ENDS_WITH_QUESTION.test(lastDialogue.trim()), checks, outcome: checkOutcome(checks) },
+    attempts: res.attempts,
     sceneAttempts,
   };
 }

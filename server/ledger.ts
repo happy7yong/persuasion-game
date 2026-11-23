@@ -292,6 +292,23 @@ export function ledgerLines(ledger: readonly LedgerItem[], perspective: "npc" | 
     .join("\n");
 }
 
+/**
+ * 실험 1 조건 B용 (docs/appraisal-review.md §14): 장부를 판정어 없이 "누가 무엇이라고 말했다"로 보여 준다.
+ * 종류·쟁점·상태(받아들여짐·열림)를 쓰지 않는다. 1차가 정리로 기록한 말도 "이 항목에 대해 '…'라고 말함"으로만 보여 준다.
+ * 그 말을 어떻게 받아들일지는 캐릭터가 정한다. 서비스의 대사 프롬프트는 이 함수를 쓰지 않는다.
+ */
+export function spokenLines(ledger: readonly LedgerItem[]): string {
+  if (ledger.length === 0) return "- (없음)";
+  const who = (s: Speaker) => (s === "player" ? "플레이어" : "너");
+  const when = (t: number) => (t === 0 ? "장면 시작" : `${t}마디`);
+  return ledger
+    .flatMap((x) => [
+      `- ${x.id} ${who(x.by)}가 ${when(x.turn)}에 말함: “${x.quote}” (${x.text})`,
+      ...(x.resolvedBy ? [`  - ${who(x.resolvedBy.by)}가 ${x.resolvedBy.turn}마디에 이 항목에 대해 말함: “${x.resolvedBy.quote}”`] : []),
+    ])
+    .join("\n");
+}
+
 const ACT_KO: Record<PlayerAct, string> = {
   apology: "사과", request: "요청", accept: "수용", reject: "거절·반박", question: "질문", accuse: "비난·단정", explain: "사정 설명", feeling: "감정 표현", propose: "방법 제안", promise: "자기 행동 약속", other: "기타",
 };
