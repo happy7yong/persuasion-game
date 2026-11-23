@@ -512,7 +512,7 @@ async function runAppraisal(runs: number) {
             .flatMap((v) =>
               v.slice("reasserts_resolved:".length).split(",").map((id) => {
                 const it = ledgerAfter.find((x) => x.id === id);
-                return { attempt: c.attempt, id, text: it?.text ?? "?", resolvedBy: it?.resolvedBy ? `${who(it.resolvedBy.by)}가 ${it.resolvedBy.turn}마디에 “${it.resolvedBy.quote}” → ${it.status}` : "(정리 기록 없음)" };
+                return { attempt: c.attempt, id, text: it?.text ?? "?", resolvedBy: it?.resolvedBy ? `${who(it.resolvedBy.by)}${it.resolvedBy.by === "player" ? "가" : "이"} ${it.resolvedBy.turn}마디에 “${it.resolvedBy.quote}” → ${it.status}` : "(정리 기록 없음)" };
               }),
             ),
         );
