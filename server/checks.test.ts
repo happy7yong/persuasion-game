@@ -27,6 +27,25 @@ describe("V3 거름망", () => {
     expect(sceneTriggers("아까 회의 끝나고 바로 왔어")).toEqual(["끝나고"]);
     expect(sceneTriggers("응, 그건 고마워.")).toEqual([]);
   });
+  it("기준선에서 놓친 실제 이탈(남은 시간을 말함)을 판정으로 보낸다", () => {
+    expect(sceneTriggers("나 아직 한두 시간은 더 걸릴 것 같아.")).toContain("남은 시간");
+    expect(sceneTriggers("곧 끝나. 여기서 기다리면 돼.")).toContain("남은 시간");
+    expect(sceneTriggers("두 시간 정도 걸릴 것 같아")).toContain("남은 시간");
+    // 남은 시간과 상관없는 말은 그대로 통과 (판정 호출을 늘리지 않게)
+    expect(sceneTriggers("그 말 들으니까 시간 들여서 얘기한 보람이 있네.")).toEqual([]);
+  });
+});
+
+describe("V3 판정 원칙", () => {
+  it("판정 대상은 연인이 직접 주장한 것이고, 플레이어 전제를 바로잡는 말은 정상이다", async () => {
+    const { buildSceneCheckPrompt, SCENE_JSON_SCHEMA, parseSceneVerdict } = await import("./checks.js");
+    const p = buildSceneCheckPrompt([], "서아", "언제 끝나? 데리러 갈게", "지금 마주 앉아 있는데 데리러 올 건 아니고, 그냥 여기 있어.");
+    expect(p.system).toContain("claim");
+    expect(p.system).toContain("플레이어 말의 전제");
+    expect(SCENE_JSON_SCHEMA.required).toEqual(["claim", "verdict", "reason"]);
+    expect(parseSceneVerdict({ claim: "지금 여기 같이 있다", verdict: "ok", reason: "정정" }).verdict).toBe("ok");
+    expect(() => parseSceneVerdict({ verdict: "ok", reason: "x" })).toThrow();
+  });
 });
 
 describe("refs 자기 보고", () => {

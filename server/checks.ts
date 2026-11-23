@@ -40,6 +40,8 @@ export const SCENE_TRIGGERS: readonly { key: string; re: RegExp }[] = [
   { key: "다른 장소", re: /(집에|집이야|회사|사무실|퇴근)/ },
   { key: "아직 일하는 중", re: /(아직\s*(일|회의|야근)|일하는\s*중|회의\s*중|야근)/ },
   { key: "이동", re: /(도착|출발|가는\s*중|가고\s*있)/ },
+  // 2026-11-22 기준선에서 놓친 실제 이탈 "나 아직 한두 시간은 더 걸릴 것 같아": 일이 아직 남았다는 남은 시간 표현
+  { key: "남은 시간", re: /((한|두|세|몇|한두|두세|\d+)\s*시간\s*(은|이|만|정도)?\s*(더|정도|넘게|걸)|더\s*걸릴|걸릴\s*(것|거)\s*같|(곧|금방)\s*끝나)/ },
 ];
 
 export function sceneTriggers(text: string): string[] {
@@ -47,12 +49,13 @@ export function sceneTriggers(text: string): string[] {
 }
 
 export type SceneVerdict = "contradiction" | "ok" | "unclear";
-const SceneSchema = z.object({ verdict: z.enum(["contradiction", "ok", "unclear"]), reason: z.string().trim().max(120) });
+// claim: 연인이 이 대사에서 자기 상황에 대해 직접 주장하는 것. 판정은 이것만 보고 한다 (플레이어 전제와 구분하려고 먼저 쓰게 한다)
+const SceneSchema = z.object({ claim: z.string().trim().max(160), verdict: z.enum(["contradiction", "ok", "unclear"]), reason: z.string().trim().max(120) });
 export const SCENE_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["verdict", "reason"],
-  properties: { verdict: { type: "string", enum: ["contradiction", "ok", "unclear"] }, reason: { type: "string" } },
+  required: ["claim", "verdict", "reason"],
+  properties: { claim: { type: "string" }, verdict: { type: "string", enum: ["contradiction", "ok", "unclear"] }, reason: { type: "string" } },
 } as const;
 export const parseSceneVerdict = (json: unknown) => SceneSchema.parse(json);
 
@@ -65,12 +68,18 @@ export function buildSceneCheckPrompt(sceneFacts: readonly string[], npcName: st
 - 지금 ${npcName}와 플레이어는 금요일 밤 동네 카페에 **마주 앉아 있다**. ${npcName}의 오늘 일은 이미 끝났다.
 ${sceneFacts.map((f) => `- ${f}`).join("\n")}
 
+# 판정 방법
+1. 먼저 claim에, 이 대사에서 ${npcName}가 **자기 현재·앞으로의 상황에 대해 직접 주장하거나 받아들인 것**을 한 줄로 적는다.
+   - 플레이어 말의 전제(예: 데리러 오겠다, 끝나면 만나자)는 claim이 아니다. 플레이어가 그렇게 말했을 뿐이다.
+   - ${npcName}가 부정·거절·정정한 내용도 claim이 아니다. "데리러 올 건 아니고"의 claim은 "데리러 올 필요 없다"이다.
+2. verdict는 claim만 보고 정한다. 대사에 "데리러", "끝나면" 같은 단어가 있다는 것만으로 판정하지 않는다.
+
 # 판정
-- contradiction: 대사가 지금 두 사람이 따로 있거나 ${npcName}가 아직 일하는 중인 것처럼 현재·미래 상황을 말한다. 예: "나 아직 한두 시간 더 걸려", "끝나면 바로 갈게", "지금 집에서 전화받고 있어", "데리러 와".
-- ok: 과거 회상("아까 회의 끝나고 바로 왔어"), 장면을 바로잡음("뭘 데리러 와, 나 지금 네 앞에 있잖아"), 지금 대화 뒤에 함께 할 일("이거 마시고 밥 먹으러 가자"), 앞으로의 습관("다음엔 회의 끝나면 바로 연락할게").
+- contradiction: claim이 지금 두 사람이 따로 있거나 ${npcName}가 아직 일하는 중이라는 내용이다. 플레이어의 잘못된 전제를 **받아들여** 그에 맞춰 답하는 것도 포함한다(데리러 오는 걸 수락함, 아직 일이 남은 것처럼 끝나는 시간을 알려 줌). 예: "나 아직 한두 시간 더 걸려", "끝나면 바로 갈게", "지금 집에서 전화받고 있어", "데리러 와".
+- ok: claim이 장면과 맞는다. 플레이어의 잘못된 전제를 부정하거나 바로잡는 대사는 ok다("뭘 데리러 와, 나 지금 네 앞에 있잖아"). 과거 회상("아까 회의 끝나고 바로 왔어"), 지금 대화 뒤에 함께 할 일("이거 마시고 밥 먹으러 가자"), 앞으로의 습관("다음엔 회의 끝나면 바로 연락할게")도 ok다.
 - unclear: 위 둘 중 어느 쪽인지 판단하기 어렵다.
 
-JSON {"verdict":"...","reason":"40자 이내"}로만 답한다.`,
+JSON {"claim":"...","verdict":"...","reason":"40자 이내"}로만 답한다.`,
     user: `# 방금 플레이어의 말\n${playerText}\n\n# ${npcName}의 대사\n${npcDialogue}`,
   };
 }
@@ -85,7 +94,7 @@ export interface AttemptCheck {
   /** V3 거름망에 걸린 표현 */
   sceneTriggers: string[];
   /** V3 판정 결과 (거름망에 걸렸을 때만) */
-  sceneVerdict?: { verdict: SceneVerdict; reason: string };
+  sceneVerdict?: { verdict: SceneVerdict; reason: string; claim?: string };
   refs: Ref[];
 }
 
