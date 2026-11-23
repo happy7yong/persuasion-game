@@ -228,18 +228,24 @@ export function buildFactsPrompt(state: GameState, playerText: string): { system
 - kind: commitment(앞으로 자기가 하겠다는 행동, "~할게") · proposal(둘이 같이 하자는 방법) · concern(서운함·걱정·억울함, 상대가 알아주길 바라는 것) · request(상대에게 바라는 행동, "~해줬으면 좋겠어") · limit(할 수 없다고 밝힌 것). "~했으면 좋았겠다" 같은 후회·인정은 약속이 아니다.
 - issue: read-gap(읽고도 답이 없었던 시간) · intent-trust(일부러 그랬는지·무시했는지에 대한 믿음) · availability(일할 때 연락할 수 있는 정도) · repair-method(앞으로 어떻게 할지).
 - npcLast: 직전 ${name}의 말에서 **새로** 생긴 항목. 장부에 이미 있는 내용이면 넣지 않는다. 첫 마디에는 비워 둔다.
-- npcResolved: 직전 ${name}의 말이 플레이어의 열린 항목을 받아들였거나(accepted) 분명히 거절했으면(rejected). 첫 마디에는 비워 둔다.
+- npcResolved: 직전 ${name}의 말이 플레이어의 열린 항목의 **내용을** 받아들인다고(accepted) 또는 거절한다고(rejected) 분명히 말했을 때만. 첫 마디에는 비워 둔다.
 - playerNew: 이번 플레이어 말에서 새로 생긴 항목.
-- playerResolved: 이번 플레이어 말이 ${name}의 열린 항목의 **내용 자체**를 받아들였거나(accepted) 거절했으면(rejected), 플레이어 자신의 열린 항목을 거둬들였으면(closed). id는 장부의 L번호 또는 이번 npcLast 순서대로 N1·N2·N3. quote는 받아들임·거절이 드러난 부분이다. 플레이어가 자기 행동을 약속한 것("조심할게")은 ${name}의 항목을 받아들인 것이 아니다(그건 playerNew의 commitment). 한 항목을 받아들였다고 다른 항목까지 닫지 않는다.
+- playerResolved: 이번 플레이어 말이 ${name}의 열린 항목의 **내용 자체**를 받아들인다고(accepted) 또는 거절한다고(rejected) 분명히 말했을 때, 플레이어 자신의 열린 항목을 거둬들인다고 말했을 때(closed)만. id는 장부의 L번호 또는 이번 npcLast 순서대로 N1·N2·N3. quote는 받아들임·거절·거둬들임이 드러난 부분이다. 플레이어가 자기 행동을 약속한 것("조심할게")은 ${name}의 항목을 받아들인 것이 아니다(그건 playerNew의 commitment). 한 항목을 받아들였다고 다른 항목까지 닫지 않는다.
 - acts: 이번 플레이어 말이 하는 일 1~3개. refersTo는 그 행위가 가리키는 장부 id, 없으면 "".
-  - apology(사과) · request(상대에게 바라는 행동을 말함. "미리 말해줬으면 좋겠어"는 비난이 아니라 request) · accept(상대 항목의 내용을 받아들임: "알겠어", "그럴 수 있지") · reject(상대 항목의 내용을 받아들이지 않거나 반박함) · question(상대 생각·사정을 진짜로 물음) · accuse(상대의 의도·마음을 나쁘게 단정하거나 탓함: "나 무시했지", "넌 맨날 그래") · explain(자기 사정 설명) · feeling(자기 감정 표현) · propose(둘이 할 방법 제안) · promise(자기 행동 약속: "단정하지 않을게") · other.
+  - apology(사과) · request(상대에게 바라는 행동을 말함. "미리 말해줬으면 좋겠어"는 비난이 아니라 request) · accept(상대 항목의 내용을 받아들인다고 분명히 말함. 맞장구나 "알겠어" 같은 말이 있다는 것만으로 accept가 아니다) · reject(상대 항목의 내용을 받아들이지 않거나 반박함) · question(상대 생각·사정을 진짜로 물음) · accuse(상대의 의도·마음을 나쁘게 단정하거나 탓함: "나 무시했지", "넌 맨날 그래") · explain(자기 사정 설명) · feeling(자기 감정 표현) · propose(둘이 할 방법 제안) · promise(자기 행동 약속: "단정하지 않을게") · other.
 - 플레이어 말 속 "너/네가"는 ${name}다. 장면이나 대화에 없는 사건·약속·시점을 만들지 않는다.
+
+# 정리(받아들임·거절·거둬들임)의 기준
+- 정리는 말한 사람이 그 항목의 **내용**을 받아들인다, 거절한다, 거둬들인다고 **말로 분명히 드러낸 경우만** 기록한다. 특정 단어가 있는지로 정하지 않는다. 원문과 앞뒤 대화에서 무엇을 받아들였는지 확인한다.
+- 그 항목에 반응했지만 내용을 받아들였는지 분명하지 않으면 정리하지 않는다. 사과, 자기 행동 약속, 상대 사정에 맞춰 주겠다는 말, 짧은 맞장구가 그런 경우일 수 있다. 이때는 acts의 refersTo로 그 항목에 **연결만** 한다.
+- 기록하는 것은 **말로 표현된** 받아들임이다. 듣는 사람이 속으로 납득했는지, 마음이 풀렸는지는 기록하지 않는다.
+- 열린 항목은 "아직 받아들인다고 말하지 않았다"는 뜻일 뿐이다. 확실하지 않으면 정리하지 않는다. npcResolved·playerResolved가 빈 배열인 것도 올바른 기록이다.
 
 # 장면 사실
 ${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}
 
 ${rubricFor(partner)}
-평가는 ${name}의 입장에서 한다. ${name}가 아직 지키는 입장은 장부의 열린 NPC 항목이다.
+평가는 ${name}의 입장에서 한다. 장부의 열린 NPC 항목은 ${name}가 말했고 플레이어가 아직 받아들인다고 말하지 않은 것이다.
 
 # 대화 장부 (지금까지)
 ${ledgerLines(state.ledger, "neutral")}
@@ -264,7 +270,8 @@ function beatLine(b: { type: string; content: string }) {
 }
 
 /** 프롬프트 버전. trace에 남겨 어떤 프롬프트로 나온 응답인지 구분한다. */
-export const NPC_PROMPT_VERSION = "ledger@1";
+// ledger@2 (2026-11-23): 1차의 정리 기준을 "말로 분명히 드러낸 경우만"으로 좁혔다 (docs/appraisal-review.md §12). 대사 프롬프트는 같다
+export const NPC_PROMPT_VERSION = "ledger@2";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {

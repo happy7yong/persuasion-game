@@ -49,6 +49,11 @@ export interface TurnFacts {
   /** 이번 플레이어 말이 하는 일 */
   acts: { act: PlayerAct; quote: string; refersTo: string }[];
   evaluation: { suggested_drop: number; labels: string[]; reason: string; noticed: string; evidence: string[] };
+  /**
+   * 1차 출력 중 검증에서 버린 것과 이유 (인용이 원문에 없음, 없는 id, 권한 위반 등).
+   * **진단 정보일 뿐이다.** 장부·감정·점수 계산과 대사 프롬프트에 쓰지 않는다. 없으면 버린 게 없다 (예전 기록도 없음).
+   */
+  dropped?: string[];
 }
 
 export const isTurnFacts = (x: unknown): x is TurnFacts => typeof x === "object" && x !== null && (x as { v?: unknown }).v === 2 && Array.isArray((x as { acts?: unknown }).acts);
@@ -96,29 +101,38 @@ export const quoted = (source: string, quote: string): boolean => {
  */
 export function resolveFacts(ledger: readonly LedgerItem[], raw: unknown, ctx: { playerText: string; prevNpc: string; turn: number }, strict: boolean): TurnFacts {
   const r = RawFactsSchema.parse(raw);
+  // problems: 출력이 틀린 것 (strict면 거부) · skipped: 틀리진 않았지만 반영하지 않은 것 (중복·첫 마디의 npcLast·없는 연결)
+  // 둘 다 dropped로 남긴다. 진단용이며 확정 장부에는 들어가지 않는다.
   const problems: string[] = [];
+  const skipped: string[] = [];
   const keep = <T>(ok: boolean, why: string, x: T): T | null => {
     if (ok) return x;
     problems.push(why);
     return null;
   };
+  const item = (it: { kind: string; text: string; quote: string }) => `${it.kind} "${it.text}" / 인용 "${it.quote}"`;
 
   let next = ledger.length + 1;
   const added: LedgerItem[] = [];
   const nIds = new Map<string, string>();
   // 직전 NPC 말에서 생긴 항목. 첫 마디는 오프닝이 이미 장면 시작 항목에 들어 있다.
+  if (ctx.turn <= 1) for (const it of r.npcLast) skipped.push(`npc_first_turn: ${item(it)}`);
   if (ctx.turn > 1) {
     r.npcLast.forEach((it, i) => {
-      const ok = keep(quoted(ctx.prevNpc, it.quote), `npc_quote:${it.quote}`, it);
-      if (!ok || [...ledger, ...added].some((x) => x.by === "npc" && x.text === it.text)) return;
+      const ok = keep(quoted(ctx.prevNpc, it.quote), `npc_quote: ${item(it)}`, it);
+      if (!ok) return;
+      if ([...ledger, ...added].some((x) => x.by === "npc" && x.text === it.text)) return void skipped.push(`duplicate: ${item(it)}`);
       const id = `L${next++}`;
       nIds.set(`N${i + 1}`, id);
       added.push({ id, by: "npc", kind: it.kind, issue: it.issue, text: it.text, quote: it.quote, turn: ctx.turn - 1, status: "open" });
     });
   }
   for (const it of r.playerNew) {
-    if (!keep(quoted(ctx.playerText, it.quote), `player_quote:${it.quote}`, it)) continue;
-    if ([...ledger, ...added].some((x) => x.by === "player" && x.text === it.text)) continue;
+    if (!keep(quoted(ctx.playerText, it.quote), `player_quote: ${item(it)}`, it)) continue;
+    if ([...ledger, ...added].some((x) => x.by === "player" && x.text === it.text)) {
+      skipped.push(`duplicate: ${item(it)}`);
+      continue;
+    }
     added.push({ id: `L${next++}`, by: "player", kind: it.kind, issue: it.issue, text: it.text, quote: it.quote, turn: ctx.turn, status: "open" });
   }
 
@@ -127,13 +141,15 @@ export function resolveFacts(ledger: readonly LedgerItem[], raw: unknown, ctx: {
   const resolved: Resolution[] = [];
   const resolve = (x: z.infer<typeof RawResolve>, by: Speaker, source: string) => {
     const id = idOf(x.id);
-    const target = all.find((i) => i.id === id && i.status === "open");
-    if (!keep(Boolean(target), `bad_id:${x.id}`, true) || !target) return;
+    const found = all.find((i) => i.id === id);
+    const target = found?.status === "open" ? found : undefined;
+    const why = found ? `not_open: ${by} ${x.id} ${x.status} (이미 ${found.status}) / 인용 "${x.quote}"` : `bad_id: ${by} ${x.id} ${x.status} / 인용 "${x.quote}"`;
+    if (!keep(Boolean(target), why, true) || !target) return;
     // 상대 항목은 받아들이거나 거절하고, 자기 항목은 거둬들인다
     const allowed = target.by === by ? x.status === "closed" : x.status !== "closed";
-    if (!keep(allowed, `bad_status:${x.id}:${x.status}`, true)) return;
-    if (!keep(quoted(source, x.quote), `${by}_resolve_quote:${x.quote}`, true)) return;
-    if (resolved.some((y) => y.id === id)) return;
+    if (!keep(allowed, `bad_status: ${by} ${x.id} ${x.status} (${target.by === by ? "자기" : "상대"} 항목) / 인용 "${x.quote}"`, true)) return;
+    if (!keep(quoted(source, x.quote), `${by}_resolve_quote: ${x.id} ${x.status} / 인용 "${x.quote}"`, true)) return;
+    if (resolved.some((y) => y.id === id)) return void skipped.push(`duplicate_resolve: ${by} ${x.id} ${x.status}`);
     resolved.push({ id, by, status: x.status, quote: x.quote });
   };
   if (ctx.turn > 1) for (const x of r.npcResolved) resolve(x, "npc", ctx.prevNpc);
@@ -141,14 +157,17 @@ export function resolveFacts(ledger: readonly LedgerItem[], raw: unknown, ctx: {
 
   const acts: TurnFacts["acts"] = [];
   for (const a of r.acts) {
-    if (!keep(quoted(ctx.playerText, a.quote), `act_quote:${a.quote}`, a)) continue;
+    if (!keep(quoted(ctx.playerText, a.quote), `act_quote: ${a.act} / 인용 "${a.quote}"`, a)) continue;
     const ref = a.refersTo ? idOf(a.refersTo) : "";
-    acts.push({ act: a.act, quote: a.quote, refersTo: ref && all.some((i) => i.id === ref) ? ref : "" });
+    const refOk = Boolean(ref) && all.some((i) => i.id === ref);
+    if (ref && !refOk) skipped.push(`bad_ref: ${a.act} → ${a.refersTo} (연결만 지움)`);
+    acts.push({ act: a.act, quote: a.quote, refersTo: refOk ? ref : "" });
   }
   if (acts.length === 0) problems.push("no_acts");
 
   if (strict && problems.length) throw new Error(`facts_invalid:${problems.slice(0, 3).join(",")}`);
-  return { v: 2, added, resolved, acts: acts.length ? acts : [{ act: "other", quote: "", refersTo: "" }], evaluation: r.evaluation };
+  const dropped = [...problems, ...skipped];
+  return { v: 2, added, resolved, acts: acts.length ? acts : [{ act: "other", quote: "", refersTo: "" }], evaluation: r.evaluation, ...(dropped.length ? { dropped } : {}) };
 }
 
 /** 확정된 사실을 장부에 적용한다 (순수 함수, 다시 적용해도 같은 결과). */

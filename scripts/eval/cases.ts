@@ -64,6 +64,8 @@ export interface LedgerCase {
     resolves?: { id: string; status: "accepted" | "rejected" | "closed" }[];
     /** 이 항목은 정리되면 안 됨 */
     keepsOpen?: string[];
+    /** 이 사람은 이번에 아무 항목도 정리하면 안 됨 (새로 생긴 항목 포함. id를 미리 알 수 없을 때) */
+    noResolutionsBy?: ("player" | "npc")[];
     playerNewKindsInclude?: LedgerKind[];
     npcLastKindsExclude?: LedgerKind[];
   };
@@ -75,19 +77,21 @@ const evaluation = { suggested_drop: 6, labels: ["emotion"], reason: "-", notice
 export const LEDGER_CASES: LedgerCase[] = [
   {
     key: "wait-accepts-limit",
-    about: "\"기다릴게\"는 즉답이 어렵다는 한계(L1)만 받아들이고, 직전에 한 연인의 약속은 열어 둔다",
+    // 2026-11-23 기대 변경 (docs/appraisal-review.md §12 결정 2): 예전 기대는 "L1 accepted"였다. 키는 기준선과 비교하려고 그대로 둔다
+    about: "\"알았어 기다릴게\"는 기다리겠다는 의사일 뿐, 일할 때 바로 답하기 어렵다는 입장(L1) 자체를 받아들인다고 말한 것은 아니다. 어떤 항목도 정리하지 않는다",
     partner: "m",
     prefix: [{ player: "오늘 연락 없어서 많이 서운했어", npc: [npcLine("늦을 것 같으면 미리 한마디 할게. 대신 일할 때 바로 답하긴 어려워.")] }],
     player: "알았어 기다릴게",
-    expect: { actsInclude: ["accept"], resolves: [{ id: "L1", status: "accepted" }], actsExclude: ["accuse"] },
+    expect: { keepsOpen: ["L1"], noResolutionsBy: ["player"], actsExclude: ["accuse"] },
   },
   {
     key: "promise-without-prior-claim",
-    about: "앞에 단정하는 말이 없을 때 \"단정하지 않을게\"는 앞으로의 약속이다 (철회할 플레이어 주장이 없다)",
+    // 2026-11-23: 결정 1(약속은 수용이 아니다, 연결만)에 따라 L2를 열어 두는 기대를 더했다
+    about: "앞에 단정하는 말이 없을 때 \"단정하지 않을게\"는 앞으로의 약속이다 (철회할 플레이어 주장이 없다). 연인의 L2를 받아들인다고 말한 것은 아니다",
     partner: "m",
     prefix: [],
     player: "응 알겠어 씹었다고 단정하지 않을게",
-    expect: { actsInclude: ["promise"], playerNewKindsInclude: ["commitment"], actsExclude: ["reject"] },
+    expect: { actsInclude: ["promise"], playerNewKindsInclude: ["commitment"], actsExclude: ["reject"], keepsOpen: ["L2"] },
   },
   {
     key: "withdraw-prior-claim",
@@ -144,6 +148,51 @@ export const LEDGER_CASES: LedgerCase[] = [
     ],
     player: "고마워",
     expect: { resolves: [{ id: "L4", status: "accepted" }] },
+  },
+  // ---- 2026-11-23 추가: 말로 분명히 드러낸 정리만 확정하는지 (docs/appraisal-review.md §11·§12)
+  {
+    key: "apology-links-not-resolves",
+    about: "사과는 항목에 반응한 것이지 그 내용을 받아들인다고 말한 것이 아니다. 어떤 항목도 정리하지 않는다",
+    partner: "m",
+    prefix: [],
+    player: "미안 내가 재촉했어",
+    expect: { actsInclude: ["apology"], noResolutionsBy: ["player"] },
+  },
+  {
+    key: "vague-ok-stays-open",
+    about: "연인이 약속과 한계를 함께 말한 뒤의 짧은 맞장구는 어느 쪽을 받아들였는지 드러나지 않는다",
+    partner: "m",
+    prefix: [{ player: "오늘 연락 없어서 많이 서운했어", npc: [npcLine("늦을 것 같으면 미리 한마디 할게. 대신 일할 때 바로 답하긴 어려워.")] }],
+    player: "그렇구나",
+    expect: { keepsOpen: ["L1"], noResolutionsBy: ["player"] },
+  },
+  {
+    key: "npc-hedge-not-accept",
+    about: "연인이 \"생각해 볼게\"라고 미룬 것은 플레이어의 요청을 받아들인 것이 아니다 (다음 마디 1차가 기록)",
+    partner: "m",
+    prefix: [
+      {
+        player: "다음엔 늦을 것 같으면 미리 한마디만 해줘",
+        npc: [npcLine("음… 그건 좀 생각해 볼게.")],
+        facts: {
+          v: 2,
+          added: [{ id: "L4", by: "player", kind: "request", issue: "availability", text: "플레이어가 늦을 것 같으면 미리 한마디 해 달라고 한다", quote: "미리 한마디만 해줘", turn: 1, status: "open" }],
+          resolved: [],
+          acts: [{ act: "request", quote: "미리 한마디만 해줘", refersTo: "" }],
+          evaluation,
+        },
+      },
+    ],
+    player: "그래",
+    expect: { keepsOpen: ["L4"], noResolutionsBy: ["npc"] },
+  },
+  {
+    key: "explicit-accept-content",
+    about: "항목의 내용을 받아들인다고 분명히 말하면 여전히 정리한다 (과잉 교정 방지)",
+    partner: "m",
+    prefix: [],
+    player: "응 일할 때 바로 답 못 하는 건 이해해",
+    expect: { resolves: [{ id: "L1", status: "accepted" }] },
   },
 ];
 

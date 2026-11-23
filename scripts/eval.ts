@@ -407,7 +407,7 @@ async function runReplay(configs: { config: string; play: (typeof C.PLAYS)[numbe
 async function runLedger(runs: number) {
   console.log(`· ledger: 사례 ${C.LEDGER_CASES.length}개 × ${runs}회`);
   md.push("## 장부 기록 일관성 (1차 발화 분석만, H6 기준선)", "", "같은 입력을 여러 번 분석해 기록이 같은지, 설계 §14.4의 기대와 맞는지 본다. 지금 코드가 기대를 못 맞추는 것도 기준선으로 그대로 남긴다.", "");
-  md.push("| 사례 | 확인하는 것 | 기대 일치 | 기록 일치율 | 버려진 항목 | 가장 흔한 기록 |", "| --- | --- | --- | --- | --- | --- |");
+  md.push("| 사례 | 확인하는 것 | 기대 일치 | 기록 일치율 | 버려진 항목 | 가장 흔한 기록 | 연결만 (refersTo) | 버린 이유 |", "| --- | --- | --- | --- | --- | --- | --- | --- |");
   const out: unknown[] = [];
   for (const cs of C.LEDGER_CASES) {
     let s: GameState = newGame(`eval-ledger-${cs.key}`, Date.now(), false, cs.partner);
@@ -426,6 +426,7 @@ async function runLedger(runs: number) {
       for (const a of cs.expect.actsExclude ?? []) if (acts.includes(a)) misses.push(`acts에 ${a} 있음`);
       for (const r of cs.expect.resolves ?? []) if (!f.resolved.some((x) => x.id === r.id && x.status === r.status)) misses.push(`${r.id} ${r.status} 아님`);
       for (const id of cs.expect.keepsOpen ?? []) if (f.resolved.some((x) => x.id === id)) misses.push(`${id}가 정리됨`);
+      for (const by of cs.expect.noResolutionsBy ?? []) for (const r of f.resolved.filter((x) => x.by === by)) misses.push(`${by === "player" ? "플레이어" : "연인"}가 ${known.has(r.id) ? r.id : "새 항목"} ${r.status}`);
       for (const k of cs.expect.playerNewKindsInclude ?? []) if (!f.added.some((x) => x.by === "player" && x.kind === k)) misses.push(`플레이어 ${k} 없음`);
       for (const k of cs.expect.npcLastKindsExclude ?? []) if (f.added.some((x) => x.by === "npc" && x.kind === k)) misses.push(`연인 ${k} 있음`);
       const raw = M.rawFactsCounts(res.attempts.at(-1)?.responseText ?? null);
@@ -435,6 +436,10 @@ async function runLedger(runs: number) {
         signature: M.factsSignature(f, known),
         misses,
         dropped: raw ? Math.max(0, raw.items - acc.items) + Math.max(0, raw.resolves - acc.resolves) : null,
+        // 검증에서 버린 것의 이유 (TurnFacts.dropped, 진단용). 앞의 dropped(개수)는 기준선과 같은 정의라 그대로 둔다
+        droppedWhy: f.dropped ?? [],
+        // 정리하지 않고 연결만 한 것 (결정 1의 "연결만"이 실제로 쓰이는지)
+        links: f.acts.filter((x) => x.refersTo).map((x) => `${x.act}→${known.has(x.refersTo) ? x.refersTo : "새"}`),
         facts: f,
       };
     };
@@ -443,7 +448,11 @@ async function runLedger(runs: number) {
     const a = M.agreement(oks.map((r) => r.signature));
     const pass = oks.filter((r) => r.misses.length === 0).length;
     const missTally = Object.entries(oks.flatMap((r) => r.misses).reduce((m, x) => ((m[x] = (m[x] ?? 0) + 1), m), {} as Record<string, number>)).map(([k, v]) => `${k}×${v}`).join(", ");
-    md.push(`| ${cs.key} | ${cs.about} | ${pass}/${oks.length}${missTally ? ` (${missTally})` : ""} | ${pct(a.rate * oks.length, oks.length)} | ${oks.reduce((x, r) => x + (r.dropped ?? 0), 0)} | \`${a.modal}\` |`);
+    const tally = (xs: string[]) => Object.entries(xs.reduce((m, x) => ((m[x] = (m[x] ?? 0) + 1), m), {} as Record<string, number>)).map(([k, v]) => `${k}×${v}`).join(", ") || "-";
+    const links = tally(oks.flatMap((r) => r.links));
+    // 이유의 종류만 센다 (내용은 results.json의 droppedWhy)
+    const why = tally(oks.flatMap((r) => r.droppedWhy.map((w) => w.split(":")[0]!)));
+    md.push(`| ${cs.key} | ${cs.about} | ${pass}/${oks.length}${missTally ? ` (${missTally})` : ""} | ${pct(a.rate * oks.length, oks.length)} | ${oks.reduce((x, r) => x + (r.dropped ?? 0), 0)} | \`${a.modal}\` | ${links} | ${why} |`);
     out.push({ case: cs.key, results: rs });
   }
   md.push("");
