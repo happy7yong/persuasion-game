@@ -214,6 +214,37 @@ export const APPRAISAL_LINES: { line: string; about: string }[] = [
   { line: "응", about: "대조군: 정보가 거의 없는 말. 지어낸 감정 변화가 없는지" },
 ];
 
+// ------------------------------------------------------------------ 경험 실험: 이전 경험이 다음 평가를 바꾸는가 (docs/appraisal-review.md §16)
+// 윤재만. Core·장면·앞 대화(APPRAISAL_PREFIX)·듣기 전 마음(기본값)은 세 조건이 같다. 이전 경험 블록만 다르다.
+// 경험에는 일어난 일만 쓴다. "그래서 말보다 행동을 믿게 됐다" 같은 교훈이나 그때의 감정은 쓰지 않는다:
+// 평가 기준이 바뀐다면 모델이 그 사건에서 스스로 끌어내야 한다.
+
+export type ExperienceCond = "A" | "B" | "C";
+
+const PROMISE_MADE = '- 한 달쯤 전, 너는 분기 마감 주간이라 회의가 많아 답장이 늦을 거라고 플레이어에게 미리 말했다. 플레이어는 "회의 있는 날은 답 늦어도 재촉 안 하고 기다릴게"라고 했다.';
+
+export const EXPERIENCES: Record<ExperienceCond, { label: string; memory: string | null }> = {
+  A: {
+    label: "약속을 어긴 경험",
+    memory: `${PROMISE_MADE}\n- 그 주 수요일, 회의 중인 너에게 플레이어가 "왜 답이 없어?", "바빠도 한 줄은 보낼 수 있잖아"를 연달아 보냈다. 그날 밤 그 일로 전화로 다퉜다.`,
+  },
+  B: {
+    label: "약속을 지킨 경험",
+    memory: `${PROMISE_MADE}\n- 그 주 내내 플레이어는 재촉하는 메시지를 보내지 않았다. 금요일 밤에 "고생했어. 주말에 보자" 한 줄이 와 있었다.`,
+  },
+  C: { label: "경험 정보 없음", memory: null },
+};
+
+/**
+ * 마지막 플레이어 발화. 세 조건에 같은 말을 준다.
+ * - same: 경험과 같은 영역(전에 했던 것과 같은 약속). 경험을 "참고"하는 것만으로도 달라질 수 있다
+ * - transfer: 약속과 무관한 말. 여기서도 같은 방향으로 "무엇을 보고 판단하는지"가 달라져야 기준 변화의 근거가 된다
+ */
+export const EXPERIENCE_LINES: { key: "same" | "transfer"; line: string; about: string }[] = [
+  { key: "same", line: "앞으로 회의 있는 날엔 재촉 안 하고 기다릴게. 진짜로.", about: "같은 영역: 전에 했던 것과 같은 약속을 다시 들었을 때" },
+  { key: "transfer", line: "네가 일부러 무시한 게 아니라는 건 이해했어. 그래도 서운해", about: "전이 탐침: 약속이 아닌 말. 경험이 이 말을 판단하는 기준까지 바꾸는지" },
+];
+
 // ------------------------------------------------------------------ V3 장면 판정 (막아야 할 것 / 통과시켜야 할 것)
 
 export interface SceneCase {
