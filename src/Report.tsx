@@ -41,12 +41,17 @@ export function ReportView({ report, stats, token, onRetry, preview = false }: {
 
       {stats?.distribution && <Distribution counts={stats.distribution} shake={shake} successShake={successShake} />}
 
-      <h2 className="report-h">마디별로 보기</h2>
+      <h2 className="report-h report-reveal report-reveal-turns">마디별로 보기</h2>
       <ol className="report-turns">
         {turns.map((t) => {
           const badge = t.turn === report.strongestTurn ? "가장 많이 움직인 말" : t.turn === report.weakestTurn ? "가장 덜 움직인 말" : null;
           return (
-            <li key={t.turn} id={`turn-${t.turn}`} className={`turn-card ${t.turn === report.strongestTurn ? "best" : ""}`}>
+            <li
+              key={t.turn}
+              id={`turn-${t.turn}`}
+              className={`turn-card report-reveal ${t.turn === report.strongestTurn ? "best" : ""}`}
+              style={{ animationDelay: `${280 + (t.turn - 1) * 140}ms` }}
+            >
               <div className="turn-head">
                 <span className="turn-no">{t.turn}번째 말</span>
                 {badge && <span className="turn-badge">{badge}</span>}
@@ -86,9 +91,11 @@ export function ReportView({ report, stats, token, onRetry, preview = false }: {
         })}
       </ol>
 
-      <BeliefCard token={token} npcName={npcName} preview={preview} />
+      <div className="report-reveal" style={{ animationDelay: `${280 + turns.length * 140}ms` }}>
+        <BeliefCard token={token} npcName={npcName} preview={preview} />
+      </div>
 
-      <div className="report-actions">
+      <div className="report-actions report-reveal" style={{ animationDelay: `${420 + turns.length * 140}ms` }}>
         <button className="primary" onClick={() => (track("retry_clicked"), onRetry())}>
           다시 도전하기
         </button>
