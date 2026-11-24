@@ -26,6 +26,8 @@ export interface ValueCell {
   /** 1차 기록과 점수 (두 조건 공통) */
   facts?: { suggested: number; labels: string[]; reason: string; noticed: string; summary: string };
   factsFailure?: string;
+  /** 1차 원본 (다음 비교에서 같은 1차를 다시 쓰려고 남긴다) */
+  raw?: unknown;
   gens: ValueGen[];
 }
 

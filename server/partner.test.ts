@@ -19,18 +19,23 @@ describe("연인 선택", () => {
     const p = buildNpcPrompt(newGame("f-context", Date.now(), false, "f"), "안녕", "counter");
     expect(p.system).toContain("투박함은 뜻이 흐리거나 어색한 문장이 아니다");
     expect(p.system).toContain("이미 말한 회의·폰·샌드위치 설명을 덧붙여 자리를 채우고 있지는 않은가");
-    expect(p.system).toContain("이미 공유한 사실을 다시 나열하지 않고");
+    // consolidate@1: counter에서 뺀 "이미 공유한 사실 나열 금지"는 반복 금지 규칙이 그대로 맡는다
+    expect(p.system).toContain("직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다");
     expect(p.system).toContain("해결책·약속·규칙을 제안하지 않는다");
     expect(p.system).toContain('thought의 "나"는 반드시 너 자신');
     expect(p.system).toContain("플레이어의 기대·서운함·요구를 네 1인칭 감정처럼 옮겨 쓰지 않는다");
     expect(p.system).toContain("Core와 현재 입장은 출발점이지");
     expect(p.system).toContain("플레이어의 말이 네 걱정이나 반론에 직접 답하고 일리가 있으면 실제로 설득될 수 있다");
-    expect(p.system).toContain('"그 말", "그 정도", "그렇게까지"로 뭉개지 않는다');
-    expect(p.system).toContain('"걸린다", "마음에 남는다", "좀 그렇다", "억울하다"');
+    // consolidate@1: 지시어 금지 대신 "헷갈릴 때만 구체적으로, 누가 누구에게 한 일인지는 바뀌면 안 된다"
+    expect(p.system).toContain("누가 누구에게 한 일인지 바뀌거나 빠져서 뜻이 달라지면 안 된다");
+    expect(p.system).toContain("NPC인 너를 뜻한다"); // 발화 주체 규칙(엔진)은 그대로
     expect(p.system).toContain("## 표현의 구체성");
+    // consolidate@1: 감정마다 이유를 풀어 쓰라는 줄과 그대로 베껴지던 예시 문장은 뺐다. 같은 감정 단어 반복 금지는 남긴다
+    expect(p.system).toContain("같은 감정 단어로 매 턴 반응을 대신하지 않는다");
+    expect(p.system).not.toContain("무엇 때문에 그런 감정이 생겼는지 구체적으로 말한다");
+    expect(p.system).not.toContain("받아들이기 어렵다\"고 쓴다");
+    expect(p.system).toContain("입장을 지킨다는 건 매번 그 입장을 말한다는 뜻이 아니다");
     expect(p.system).not.toContain("여덟 시간 기다린 건 걸리네");
-    expect(p.system).toContain('"나한테 일부러 그런 것처럼 말한"');
-    expect(p.system).toContain('"내가 일부러 너를 무시한 것처럼 말한 건 받아들이기 어렵다"');
     expect(p.system).toContain('플레이어의 "너/네가"는 NPC인 너를 뜻한다');
     expect(p.system).toContain('"X하겠다는 말", "그건 하겠다는 거네"');
     expect(p.system).toContain("이미 공유된 요구의 재확인에는 수락·거절·조건 조정·다음 행동 중 하나로 대화를 진행한다");
@@ -43,7 +48,9 @@ describe("연인 선택", () => {
     expect(coreFor("m")).toContain("한 번의 짧은 연락을 말한 것이라면");
     expect(coreFor("m")).toContain("그 결과에는 먼저 짧게 사과한다");
     expect(coreFor("m")).toContain("상대를 훈계하거나 심문하듯 몰아붙이지 않는다");
-    expect(coreFor("m")).toContain("사과할 때는 무엇을 사과하는지 명사를 분명히 말하고");
+    // consolidate@1: 사과의 형식(명사·순서) 지시는 뺐고 사과의 의미는 남겼다
+    expect(coreFor("m")).toContain("사과는 일부러 무시했다는 해석이나 앞으로 항상 연락하겠다는 약속에 동의하는 뜻이 아니다");
+    expect(coreFor("m")).not.toContain("명사를 분명히");
     expect(coreFor("m")).toContain("플레이어가 팀장에게 혼난 일은 진심으로 걱정하고 있다");
     expect(coreFor("m")).toContain("억울하고 서운하다");
     expect(coreFor("m")).toContain("윤재가 원하는 것과 화가 나는 조건");

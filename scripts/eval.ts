@@ -15,7 +15,7 @@
 //   npm run eval -- appraisal [--runs 3]  # 실험 1: 캐릭터 직접 해석 (docs/appraisal-review.md §14). 같은 발화를 윤재·서아에게,
 //                                         # A 기존 엔진 · B 직접 해석(평가 전용 프롬프트)으로. 1차 결과는 A·B가 같이 쓴다.
 //                                         # 결과: 가린 비교표 + 정답 키(blind-key.json) + 해석 검토표
-//   npm run eval -- value [--runs 2] [--model 모델]  # 가치 실험 (docs/character-intent.md §6). 윤재 첫 마디, 발화 4개를
+//   npm run eval -- value [--runs 2] [--model 모델] [--only base|value]  # 가치 실험 (docs/character-intent.md §6). 윤재 첫 마디, 발화 4개를
 //                                         # 기존 Core / Core + 가치 단락으로. 대사 모델은 배포 모델(Terra), 1차는 발화마다 1회(두 조건 공통).
 //                                         # 결과: 가린 비교표 + 정답 키(value-key.json) + 검토표
 //   --label 이름                         # 결과 폴더 이름에 붙임
@@ -591,6 +591,8 @@ async function runAppraisal(runs: number) {
 
 // ------------------------------------------------------------------ 가치 실험 (docs/character-intent.md §6)
 
+// --only base|value: 한 조건만 돌린다 (프롬프트 통합처럼 가치 단락과 무관한 비교에 쓴다)
+const VALUE_CONDS = (["base", "value"] as const).filter((c) => !opt("only") || c === opt("only"));
 async function runValue(runs: number) {
   console.log(`· value: 윤재 첫 마디 · 발화 ${C.VALUE_LINES.length}개 × 조건 2 × ${runs}회 · 대사 모델 ${MODELS.npc_turn}`);
   const seed = parseInt(createHash("sha256").update(stamp).digest("hex").slice(0, 8), 16);
@@ -614,6 +616,7 @@ async function runValue(runs: number) {
     }
     const facts = fr.value;
     const who = (b: string) => (b === "player" ? "플레이어" : "윤재");
+    cell.raw = facts;
     cell.facts = {
       suggested: facts.evaluation.suggested_drop,
       labels: facts.evaluation.labels,
@@ -625,7 +628,7 @@ async function runValue(runs: number) {
         `발화 행위: ${facts.acts.map((a) => `${a.act}${a.refersTo ? `→${a.refersTo}` : ""}`).join(", ")}`,
       ].join(" · "),
     };
-    const jobs = (["base", "value"] as const).flatMap((cond) => Array.from({ length: runs }, (_, i) => ({ cond, run: i + 1 })));
+    const jobs = VALUE_CONDS.flatMap((cond) => Array.from({ length: runs }, (_, i) => ({ cond, run: i + 1 })));
     cell.gens = await pool(jobs, 4, async (job): Promise<Gen> => {
       const fail = (failure: string, drafts: Gen["drafts"] = []): Gen => ({ cond: job.cond, run: job.run, ok: false, failure, drafts });
       if (!budget.allow(APPRAISAL_GEN.max)) return fail(`budget: ${budget.stopped}`);
@@ -921,7 +924,7 @@ if (rejudgeData) B.addToPlan(plan, "재판정", rejudgeData.toJudge.length * R.r
 const APPRAISAL_GEN = { expected: 1.15 * EST.npc_turn + 0.45 * EST.scene_check, max: 2 * EST.npc_turn + 2 * EST.scene_check, expectedCalls: 1.6, maxCalls: 4 };
 if (mode === "value") {
   B.addToPlan(plan, "가치 실험 1차 (두 조건 공통)", C.VALUE_LINES.length, one("turn_frame"));
-  B.addToPlan(plan, "가치 실험 대사 (윤재 × 조건 2, 배포 모델)", C.VALUE_LINES.length * 2 * R.valueRuns, APPRAISAL_GEN);
+  B.addToPlan(plan, `가치 실험 대사 (윤재 × 조건 ${VALUE_CONDS.join("·")}, 배포 모델)`, C.VALUE_LINES.length * VALUE_CONDS.length * R.valueRuns, APPRAISAL_GEN);
 }
 if (mode === "appraisal") {
   B.addToPlan(plan, "실험 1 1차 (A·B 공통)", C.APPRAISAL_LINES.length * 2, one("turn_frame"));
