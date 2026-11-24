@@ -162,6 +162,9 @@ button:disabled {
     transform: none;
     animation: none;
   }
+  .intro-message-unread {
+    display: none;
+  }
 }
 .intro-lede {
   font-size: 17px;
@@ -190,7 +193,7 @@ button:disabled {
   animation-delay: 2.15s;
 }
 .intro-message:nth-child(3) {
-  animation-delay: 2.9s;
+  animation-delay: 3.65s;
 }
 .intro-message.me {
   justify-content: end;
@@ -215,6 +218,19 @@ button:disabled {
   font-size: 11px;
   line-height: 1.2;
 }
+.intro-message-unread {
+  color: #e69a35;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  animation: intro-unread-clear 0ms linear both;
+}
+.intro-message-unread.first {
+  animation-delay: 3.24s;
+}
+.intro-message-unread.second {
+  animation-delay: 3.24s;
+}
 .intro-message.npc {
   margin-top: 15px;
 }
@@ -224,20 +240,25 @@ button:disabled {
     transform: translateY(0);
   }
 }
+@keyframes intro-unread-clear {
+  to {
+    opacity: 0;
+  }
+}
 .intro-reveal-lede {
-  animation-delay: 3.68s;
+  animation-delay: 4.48s;
 }
 .intro-reveal-count {
-  animation-delay: 3.82s;
+  animation-delay: 4.62s;
 }
 .intro-reveal-rules {
-  animation-delay: 3.96s;
+  animation-delay: 4.76s;
 }
 .intro-reveal-consent {
-  animation-delay: 4.1s;
+  animation-delay: 4.9s;
 }
 .intro-reveal-start {
-  animation-delay: 4.24s;
+  animation-delay: 5.04s;
 }
 @keyframes intro-reveal {
   to {

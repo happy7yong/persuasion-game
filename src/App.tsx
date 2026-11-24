@@ -325,10 +325,12 @@ function Intro({
         </h1>
         <ol className="intro-message-timeline" aria-label="오늘 주고받은 메시지">
           <li className="intro-message me">
+            <span className="intro-message-unread first" aria-hidden="true">1</span>
             <time>10:36</time>
             <span className="intro-message-bubble">오늘 진짜 힘들다...</span>
           </li>
           <li className="intro-message me">
+            <span className="intro-message-unread second" aria-hidden="true">1</span>
             <time>16:25</time>
             <span className="intro-message-bubble">뭐해?</span>
           </li>
