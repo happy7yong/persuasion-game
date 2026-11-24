@@ -13,6 +13,7 @@ import {
 import { ReportView } from "./Report";
 import { GiveupDialog } from "./GiveupDialog";
 import { PartnerDialog } from "./PartnerDialog";
+import { useTextareaHeight } from "./useTextareaHeight";
 import { ChatNotice } from "./ChatNotice";
 import { KakaoPhone } from "./KakaoPhone";
 import { ResultSummary } from "./ResultSummary";
@@ -426,7 +427,9 @@ function Chat({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirmGiveup, setConfirmGiveup] = useState(false);
   const tokenRef = useRef(session.token);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const pending = useRef<{ text: string; key: string } | null>(null);
+  useTextareaHeight(composerRef, text);
   const idRef = useRef(session.msgs.reduce((m, x) => Math.max(m, x.id + 1), 0));
   const endRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
@@ -675,6 +678,7 @@ function Chat({
         <div className="composer">
           {noticeView}
           <textarea
+            ref={composerRef}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -682,7 +686,7 @@ function Chat({
                 setNotice(null);
             }}
             placeholder={busy ? "" : `${scenario.npcName}에게 하고 싶은 말`}
-            rows={3}
+            rows={1}
             disabled={busy || notice?.action === "restart"}
             aria-label={`${scenario.npcName}에게 할 말`}
             aria-invalid={over}

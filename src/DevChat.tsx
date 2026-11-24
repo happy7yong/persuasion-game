@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { PARTNER_OPTIONS, type Partner } from "./api";
 import { KakaoPhone } from "./KakaoPhone";
 import { ChatNotice } from "./ChatNotice";
+import { useTextareaHeight } from "./useTextareaHeight";
 
 type PreviewMessage = {
   id: number;
@@ -54,6 +55,8 @@ export function DevChat() {
     initialMessages("서아"),
   );
   const [draft, setDraft] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  useTextareaHeight(composerRef, draft);
   const endRef = useRef<HTMLDivElement>(null);
   const lastSeenId = useRef(6);
   const used = messages
@@ -184,10 +187,11 @@ export function DevChat() {
 
       <div className="composer">
         <textarea
+          ref={composerRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={`${chosen.name}에게 하고 싶은 말`}
-          rows={3}
+          rows={1}
           aria-label={`${chosen.name}에게 할 말`}
           aria-invalid={over}
           disabled={turns >= 5}
