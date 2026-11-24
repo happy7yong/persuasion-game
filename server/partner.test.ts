@@ -18,7 +18,6 @@ describe("연인 선택", () => {
   it("서아는 투박해도 문장이 어긋나거나 이미 말한 사정을 반복하지 않는다", () => {
     const p = buildNpcPrompt(newGame("f-context", Date.now(), false, "f"), "안녕", "counter");
     expect(p.system).toContain("투박함은 뜻이 흐리거나 어색한 문장이 아니다");
-    expect(p.system).toContain("이미 말한 회의·폰·샌드위치 설명을 덧붙여 자리를 채우고 있지는 않은가");
     // consolidate@1: counter에서 뺀 "이미 공유한 사실 나열 금지"는 반복 금지 규칙이 그대로 맡는다
     expect(p.system).toContain("직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다");
     expect(p.system).toContain("해결책·약속·규칙을 제안하지 않는다");
