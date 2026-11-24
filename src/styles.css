@@ -277,17 +277,40 @@ button:disabled {
 
 /* chat */
 .chat {
+  position: relative;
+  isolation: isolate;
   max-width: 480px;
   margin: 0 auto;
   min-height: 100svh;
   padding: 0 14px 220px;
+}
+.chat::before,
+.chat::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, 480px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.chat::before {
+  z-index: -2;
+  background: url("/cafe-background.png") center / cover no-repeat;
+  filter: blur(12px);
+  clip-path: inset(0);
+}
+.chat::after {
+  z-index: -1;
+  background: rgba(255, 249, 239, 0.18);
 }
 .chat-head {
   position: sticky;
   top: 0;
   z-index: 2;
   margin-inline: -14px;
-  background: rgba(237, 248, 250, 0.42);
+  background: rgba(255, 249, 239, 0.58);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   display: flex;
@@ -423,10 +446,13 @@ button:disabled {
   justify-self: end;
 }
 .beat-narr {
-  color: var(--muted);
+  width: fit-content;
+  color: var(--ink);
+  background: rgba(255, 249, 239, 0.78);
+  border-radius: 12px;
   font-size: 14px;
   font-style: italic;
-  padding: 0 4px;
+  padding: 6px 10px;
   animation: pop 0.25s ease-out;
 }
 .typing {
@@ -551,8 +577,9 @@ button:disabled {
 }
 .dev-chat-tools p {
   margin: 8px 0;
-  color: var(--muted);
+  color: var(--white);
   font-size: 13px;
+  text-shadow: 0 1px 4px rgba(34, 15, 7, 0.8);
 }
 .dev-chat-actions {
   display: flex;
