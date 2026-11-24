@@ -86,9 +86,46 @@ export interface GameState {
   ledger: LedgerItem[];
   /** 이미 점수를 준 관계 변화 (같은 변화에 두 번 주지 않는다) */
   progress: ProgressEvent[];
+  /** 이번 판에서 플레이어가 직접 밝힌 서운함과 그에 대한 NPC 응답의 인용 근거. */
+  relationshipEvidence?: RelationshipEvidence;
   turns: TurnRecord[];
   finished: boolean;
   outcome: Outcome | null;
+}
+
+/** 한 판에서 실제로 오간 서운함의 근거. 점수와 무관하며, 시작 카톡만으로는 채워지지 않는다. */
+export interface RelationshipEvidence {
+  player: { turn: number; itemId: string; quote: string; message: string } | null;
+  npc: { turn: number; itemId: string; quote: string } | null;
+}
+
+/** 플레이어의 이번 판 발화와 윤재의 응답을 같은 장부 항목으로 잇는다. */
+export function relationshipEvidence(state: GameState): RelationshipEvidence {
+  const candidates = state.turns.flatMap((turn, index) => {
+    const hasFeeling = turn.facts?.acts.some((act) => act.act === "feeling") ?? false;
+    // 감정과 계기가 함께 말해진 경우만 인정한다. 오프닝의 L3은 후보가 아니다.
+    if (!hasFeeling || !/(불안|서운|걱정|외롭|혼자|속상|무섭|섭섭|상처)/u.test(turn.player)
+      || !/(읽|답|연락|소식|기다|카톡|메시지|15[:시])/u.test(turn.player)) return [];
+    return (turn.facts?.added ?? [])
+      .filter((item) => item.by === "player" && item.kind === "concern" && item.issue === "read-gap" && item.turn === index + 1)
+      .map((item) => ({ turn: index + 1, itemId: item.id, quote: item.quote, message: turn.player }));
+  });
+  const responses = candidates.flatMap((player) => state.turns.flatMap((turn, index) => {
+    if (index + 1 < player.turn) return [];
+    const direct = turn.facts?.responseRefs?.some((ref) => ref.id === player.itemId && ref.use === "reflect");
+    if (direct) {
+      const quote = turn.npc.find((beat) => beat.type === "dialogue" && /(불안|서운|걱정|외롭|혼자|속상|무섭|섭섭|상처|기다)/u.test(beat.content))?.content;
+      return quote ? [{ turn: index + 1, itemId: player.itemId, quote, player }] : [];
+    }
+    // 이전 턴의 응답은 다음 턴의 발화 분석에서 수용 근거로 확인될 수도 있다.
+    const accepted = turn.facts?.resolved.find((r) => r.by === "npc" && r.id === player.itemId && r.status === "accepted");
+    return accepted && index > 0 ? [{ turn: index, itemId: player.itemId, quote: accepted.quote, player }] : [];
+  }));
+  const response = responses[0];
+  return {
+    player: response?.player ?? candidates[0] ?? null,
+    npc: response ? { turn: response.turn, itemId: response.itemId, quote: response.quote } : null,
+  };
 }
 
 export function newGame(id: string, now: number, heardBefore: boolean, partner: "m" | "f" = "m"): GameState {
@@ -97,6 +134,7 @@ export function newGame(id: string, now: number, heardBefore: boolean, partner: 
     currentMind: { fatigue: 3, guilt: 1, defensiveness: 3, care: 2, openness: 1 },
     ledger: initialLedger(),
     progress: [],
+    relationshipEvidence: { player: null, npc: null },
   };
 }
 
@@ -139,6 +177,15 @@ export function scoreTurn(
   return { breakdown: { kind: "state", suggested, base, eventBonus, mindBonus, applied }, progress };
 }
 
+/** 이번 말의 확정된 사실만으로 대사 전에 계산할 수 있는 변화. 응답 이후에도 같은 결과를 사용한다. */
+export function projectTurn(state: GameState, facts: TurnFacts, suggested: number, labels: readonly StrategyLabel[]) {
+  const ledger = applyFacts(state.ledger, facts, state.turns.length + 1);
+  const prevFacts = state.turns.at(-1)?.facts;
+  const currentMind = nextMind(state.currentMind, facts, ledger, prevFacts && isTurnFacts(prevFacts) ? prevFacts : null);
+  const { breakdown, progress } = scoreTurn(state, currentMind, progressEvents(facts, ledger, isFinalTurn(state)), suggested, labels);
+  return { ledger, currentMind, progress, breakdown, score: Math.max(0, state.score - breakdown.applied) };
+}
+
 /** 글자 수. 이모지 등 서로게이트 쌍을 한 글자로 센다. */
 export function countChars(text: string): number {
   return Array.from(text).length;
@@ -178,16 +225,12 @@ export function band(score: number): "firm" | "wavering" | "seeking" | "acceptin
 }
 
 export function recordTurn(state: GameState, turn: Omit<TurnRecord, "scoreAfter" | "applied">): GameState {
-  const n = state.turns.length + 1;
   let session: Pick<GameState, "currentMind" | "ledger" | "progress"> = { currentMind: state.currentMind, ledger: state.ledger, progress: state.progress };
   let scoring: ScoreBreakdown;
   if (turn.facts && isTurnFacts(turn.facts)) {
-    const ledger = applyFacts(state.ledger, turn.facts, n);
-    const prevFacts = state.turns.at(-1)?.facts;
-    const mind = nextMind(state.currentMind, turn.facts, ledger, prevFacts && isTurnFacts(prevFacts) ? prevFacts : null);
-    const { breakdown, progress } = scoreTurn(state, mind, progressEvents(turn.facts, ledger, isFinalTurn(state)), turn.suggested, turn.labels);
-    session = { currentMind: mind, ledger, progress };
-    scoring = breakdown;
+    const projected = projectTurn(state, turn.facts, turn.suggested, turn.labels);
+    session = { currentMind: projected.currentMind, ledger: projected.ledger, progress: projected.progress };
+    scoring = projected.breakdown;
   } else {
     // 장부 도입 전 기록·대본 모드: AI 제안값만 규칙으로 자른다
     const applied = applyDrop(turn.suggested, turn.labels);
@@ -198,6 +241,7 @@ export function recordTurn(state: GameState, turn: Omit<TurnRecord, "scoreAfter"
   const turns = [...state.turns, { ...turn, applied, scoreBreakdown: scoring, scoreAfter: score }];
   const charsUsed = state.charsUsed + countChars(turn.player);
   const next: GameState = { ...state, score, turns, charsUsed, ...session };
+  next.relationshipEvidence = relationshipEvidence(next);
   const outOfTurns = turns.length >= RULES.maxTurns;
   const outOfChars = charsUsed >= RULES.charBudget;
   if (outOfTurns || outOfChars) return finish(next, null);
