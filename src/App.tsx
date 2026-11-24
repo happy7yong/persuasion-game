@@ -130,7 +130,7 @@ export function App() {
           preview
           onRetry={() => window.location.assign(window.location.pathname)}
         />
-        <AppFooter showDesignNotes />
+        <DesignNotes />
       </>
     );
   }
@@ -160,7 +160,6 @@ export function App() {
             })
           }
         />
-        <AppFooter />
       </>
     );
   }
@@ -173,11 +172,10 @@ export function App() {
           token={session.token}
           onRetry={restart}
         />
-        <AppFooter showDesignNotes />
+        <DesignNotes />
       </>
     );
   }
-  // 채팅 화면에는 푸터(문의)를 두지 않는다: 대화에만 집중하게, 입력바와 겹치지 않게
   return (
     <Chat
       session={session}
@@ -187,10 +185,9 @@ export function App() {
   );
 }
 
-function AppFooter({ showDesignNotes = false }: { showDesignNotes?: boolean }) {
+/** 결과 화면 아래 "설계 참고". 문의 푸터는 2026-11-24에 뺐다 */
+function DesignNotes() {
   return (
-    <>
-      {showDesignNotes && (
         <aside className="design-notes" aria-label="피드백 설계 참고">
           <p className="design-notes-title">설계 참고</p>
           <p>
@@ -230,12 +227,6 @@ function AppFooter({ showDesignNotes = false }: { showDesignNotes?: boolean }) {
             </li>
           </ul>
         </aside>
-      )}
-      <footer className="app-footer">
-        문의:{" "}
-        <a href="mailto:chaeyoung7742@gmail.com">chaeyoung7742@gmail.com</a>
-      </footer>
-    </>
   );
 }
 
