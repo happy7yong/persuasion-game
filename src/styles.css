@@ -526,6 +526,43 @@ button:disabled {
   color: #c0264f;
   font-weight: 700;
 }
+.composer-key-hint {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .composer-key-hint {
+    display: none;
+  }
+}
+/* 로컬 채팅 화면 미리보기 (?dev=chat) */
+.dev-chat-tools {
+  padding: 18px 2px 14px;
+}
+.dev-chat-tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--ink);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+}
+.dev-chat-tools p {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.dev-chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dev-chat-selected {
+  background: var(--cobalt);
+  color: var(--white);
+}
 /* 작은 알약 버튼 */
 .chip {
   border: 0;

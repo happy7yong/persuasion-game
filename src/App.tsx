@@ -705,16 +705,6 @@ function Chat({
               if (notice?.kind === "error" && notice.action !== "restart")
                 setNotice(null);
             }}
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing
-              ) {
-                e.preventDefault();
-                if (!busy) void send();
-              }
-            }}
             placeholder={busy ? "" : `${scenario.npcName}에게 하고 싶은 말`}
             rows={3}
             disabled={busy || notice?.action === "restart"}
@@ -725,6 +715,7 @@ function Chat({
             <span className={`count ${over ? "over" : ""}`}>
               {msgLen}/{Math.min(rules.messageMax, session.left)}자
             </span>
+            <span className="composer-key-hint">Enter는 줄바꿈</span>
             <button
               className="chip chip-quiet"
               onClick={() => setConfirmGiveup(true)}
