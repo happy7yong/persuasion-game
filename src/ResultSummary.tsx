@@ -58,8 +58,10 @@ export function ResultSummary({
       <Title className="report-title">
         {friend ? "친구는 " : ""}
         {npcName}와
-        <span className="report-number">{shown}%</span>
-        통했어요
+        <span className="report-title-result">
+          <span className="report-number">{shown}%</span>
+          <span>통했어요</span>
+        </span>
       </Title>
       <div className="meter" role="meter" aria-label={`${npcName}와 마음이 통한 정도`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={shake}>
         <div className="meter-fill" style={{ width: `${shown}%` }} />

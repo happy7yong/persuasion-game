@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PARTNER_OPTIONS, type Partner } from "./api";
+import { KakaoPhone } from "./KakaoPhone";
+import { ChatNotice } from "./ChatNotice";
 
 type PreviewMessage = {
   id: number;
@@ -16,20 +18,25 @@ const initialMessages = (name: string): PreviewMessage[] => [
   {
     id: 2,
     who: "npc",
-    text: "팀장님 얘기는 이따 마저 하자. 그건 진짜 열받았겠다.",
+    text: "아까 답 늦은 건 미안해.",
   },
   {
     id: 3,
-    who: "npc",
-    text: "근데 '나 무시해?'는 좀… 나 오늘 회의 네 개 연달아 들어갔어.",
+    who: "narration",
+    text: "빨대를 만지작거리다 손을 멈춘다.",
   },
   {
     id: 4,
+    who: "npc",
+    text: "근데 '나 무시해?'는 좀… 그 말은 서운했어.",
+  },
+  {
+    id: 5,
     who: "me",
     text: "아 미안, 무시한다고 한 건 좀 심했어. 근데 하루 종일 답이 없어서 나도 좀 서운했어.",
   },
   {
-    id: 5,
+    id: 6,
     who: "npc",
     text: "나도 미안해. 읽고도 답을 안 한 건 네가 더 기다리게 만든 거니까.",
   },
@@ -47,9 +54,8 @@ export function DevChat() {
     initialMessages("서아"),
   );
   const [draft, setDraft] = useState("");
-  const [showKakao, setShowKakao] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-  const lastSeenId = useRef(5);
+  const lastSeenId = useRef(6);
   const used = messages
     .filter((message) => message.who === "me")
     .reduce((sum, message) => sum + Array.from(message.text).length, 0);
@@ -148,63 +154,30 @@ export function DevChat() {
             오늘 낮, 답장이 없었던 일을 두고 마주 앉아 있어요.
           </p>
         </div>
-        <div className="chat-meter">
-          <span className="chat-turn">{Math.min(turns + 1, 5)}/5번째 말</span>
-          <div
-            className="budget"
-            role="meter"
-            aria-label="남은 발언권"
-            aria-valuemin={0}
-            aria-valuemax={600}
-            aria-valuenow={left}
-          >
-            <div className="budget-fill" style={{ width: `${(left / 600) * 100}%` }} />
-          </div>
-          <span className="chat-left">발언권 {left}자</span>
-        </div>
       </header>
 
-      <section className="kakao">
-        <button
-          type="button"
-          className="kakao-toggle"
-          aria-expanded={showKakao}
-          onClick={() => setShowKakao((current) => !current)}
-        >
-          오늘 주고받은 메시지 {showKakao ? "접기" : "보기"}
-        </button>
-        {showKakao && (
-          <ol className="kakao-list">
-            <li className="kakao-row me">
-              <div className="kakao-line">
-                <span className="kakao-bubble">바빠?</span>
-                <time>15:10</time>
-              </div>
-              <div className="kakao-read">읽음 15:32</div>
-            </li>
-            <li className="kakao-row npc">
-              <div className="kakao-line">
-                <span className="kakao-bubble">
-                  미안 회의 연달아 있었어. 이따 카페에서 봐
-                </span>
-                <time>18:52</time>
-              </div>
-            </li>
-          </ol>
-        )}
-      </section>
+      <KakaoPhone
+        key={partner}
+        npcName={chosen.name}
+        kakao={[
+          { time: "15:10", from: "me", text: "바빠?", readAt: "15:32" },
+          { time: "17:35", from: "me", text: "나 무시해?" },
+          {
+            time: "18:52",
+            from: "npc",
+            text: "미안 회의 연달아 있었어. 이따 카페에서 봐",
+          },
+        ]}
+      />
 
       <ol className="thread" aria-live="polite">
+        <ChatNotice />
         {messages.map((message) =>
           message.who === "narration" ? (
-            <li key={message.id} className="beat-narr">
-              {message.text}
-            </li>
+            <li key={message.id} className="beat-narr">{message.text}</li>
           ) : (
-            <li key={message.id} className={`bubble ${message.who}`}>
-              {message.text}
-            </li>
-          ),
+            <li key={message.id} className={`bubble ${message.who}`}>{message.text}</li>
+          )
         )}
       </ol>
       <div ref={endRef} className="thread-end" />
@@ -223,6 +196,8 @@ export function DevChat() {
           <span className={`count ${over ? "over" : ""}`}>
             {count}/{Math.min(300, left)}자
           </span>
+          <span className="chat-left">발언권 {left}자</span>
+          <span className="chat-turn">{Math.min(turns + 1, 5)}/5번째 말</span>
           <span className="composer-key-hint">Enter는 줄바꿈</span>
           <button
             type="button"
