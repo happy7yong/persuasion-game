@@ -92,6 +92,18 @@ describe("마음은 코드 규칙으로만 바뀐다", () => {
     // 연인의 걱정(L2)을 짚은 사과는 방어심을 낮춘다
     expect(nextMind(mind, f([{ act: "apology", quote: "무시했다고 해서 미안", refersTo: "L2" }]), initialLedger(), bare).defensiveness).toBe(1);
   });
+  it("플레이어가 사과를 거듭하면 미안함이 쌓인다 (한 마디에 한 단계, 최대 3)", () => {
+    const sorry = f([{ act: "apology", quote: "미안해", refersTo: "" }]);
+    const once = nextMind(mind, sorry, initialLedger(), null);
+    expect(once.guilt).toBe(2);
+    const twice = nextMind(once, sorry, initialLedger(), sorry);
+    expect(twice.guilt).toBe(3);
+    // 한 마디에 사과가 여러 번이어도 한 단계, 3에서 더 오르지 않는다
+    expect(nextMind(mind, f([{ act: "apology", quote: "미안", refersTo: "" }, { act: "apology", quote: "진짜 미안", refersTo: "L2" }]), initialLedger(), null).guilt).toBe(2);
+    expect(nextMind(twice, sorry, initialLedger(), sorry).guilt).toBe(3);
+    // 기존 규칙은 그대로: 짚지 않은 사과를 반복하면 방어심도 오른다 (미안하면서 답답할 수 있다)
+    expect(twice.defensiveness).toBe(3);
+  });
 });
 
 describe("점수 이벤트는 장부 변경에서 나온다", () => {

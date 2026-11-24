@@ -204,6 +204,8 @@ const sign = (v: number) => (v > 0 ? 1 : v < 0 ? -1 : 0);
  * - 연인의 한계·걱정·약속을 받아들임 → 방어심↓
  * - 자기 서운함·사정을 솔직히 설명 → 미안함↑, 챙김↑
  * - 연인의 항목을 짚은 사과 → 방어심↓ / 아무것도 짚지 않은 사과를 두 번째로 반복 → 방어심↑
+ * - 플레이어가 사과하면 → 미안함↑ (2026-11-24: 상대가 연신 미안하다고 하면 사람은 오히려 미안해진다. 사과를 거듭하면 미안함이 쌓인다.
+ *   위 방어심 규칙과 함께 걸릴 수 있다: 미안하면서도 답답할 수 있다)
  * - 방법 제안·자기 행동 약속 → 열림↑
  * 피곤함은 한 판(다섯 마디) 안에서 바뀌지 않는다.
  */
@@ -217,6 +219,7 @@ export function nextMind(mind: Mind, facts: TurnFacts, ledger: readonly LedgerIt
   if (facts.resolved.some((r) => r.by === "player" && r.status === "accepted" && npcItem(r.id))) d.defensiveness -= 1;
   if ((acts.includes("feeling") || acts.includes("explain")) && !acts.includes("accuse")) (d.guilt += 1), (d.care += 1);
   const apologies = facts.acts.filter((a) => a.act === "apology");
+  if (apologies.length) d.guilt += 1;
   if (apologies.some((a) => a.refersTo && npcItem(a.refersTo))) d.defensiveness -= 1;
   else if (apologies.length && prevFacts?.acts.some((a) => a.act === "apology" && !a.refersTo) && ledger.some((x) => x.by === "npc" && x.status === "open" && x.kind === "concern"))
     d.defensiveness += 1;
