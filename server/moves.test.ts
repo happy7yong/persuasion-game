@@ -52,7 +52,8 @@ describe("끝맺음 방식 고르기", () => {
   it("프롬프트에 이번 끝맺음 방식이 들어가고, 먼저 제안하지 말라는 규칙이 있다", () => {
     const p = buildNpcPrompt(newGame("x", Date.now(), false), "안녕", "counter");
     expect(p.system).toContain("반론:");
-    expect(p.system).toContain("먼저 제안하지 않는다");
+    // consolidate@3: 해결책을 먼저 꺼내지 않는 건 게임 진행 규칙이라 Core가 아니라 끝맺음 지시(MOVE_GUIDE)가 맡는다
+    expect(p.system).toContain("플레이어가 먼저 꺼내지 않았다면 해결책·약속·규칙을 제안하지 않는다");
     expect(p.system).toContain("직전 응답과 반복 금지");
     expect(p.system).not.toContain("마지막 beat는 플레이어가 대답할 수 있게");
   });

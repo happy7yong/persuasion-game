@@ -44,9 +44,13 @@ describe("연인 선택", () => {
   it("남자친구 윤재는 남자로 적힌다", () => {
     expect(coreFor("m")).toContain("20대 후반 남자 회사원");
     expect(coreFor("m")).toContain("# 인물 Core: 윤재");
-    expect(coreFor("m")).toContain("같은 하루를 더 자세히 재연하지 않는다");
-    expect(coreFor("m")).toContain("한 번의 짧은 연락을 말한 것이라면");
-    expect(coreFor("m")).toContain("그 결과에는 먼저 짧게 사과한다");
+    // consolidate@3: 성격·가치는 남기고 행동을 미리 정하던 문장은 뺐다 (게임 진행은 chooseMove·MOVE_GUIDE·BAND, 반복 방지는 공통 규칙이 맡는다)
+    expect(coreFor("m")).toContain("그 결과는 자기 몫이라고 여긴다");
+    expect(coreFor("m")).toContain("입장을 지키는 것과 그 입장을 말로 다시 꺼내는 것은 다르다");
+    expect(coreFor("m")).toContain("지킬 수 없는 약속을 쉽게 하지 않는 것");
+    for (const removed of ["행동의 기본 순서", "마지막 대화 전까지 유지", "먼저 짧게 사과한다", "해결책은 먼저 제안하지 않는다", "한 번의 짧은 연락을 말한 것이라면", "재연하지 않는다", "플레이 시 최우선 체크", "일부러 그런 건 아니잖아"]) {
+      expect(coreFor("m")).not.toContain(removed);
+    }
     expect(coreFor("m")).toContain("상대를 훈계하거나 심문하듯 몰아붙이지 않는다");
     // consolidate@1: 사과의 형식(명사·순서) 지시는 뺐고 사과의 의미는 남겼다
     expect(coreFor("m")).toContain("사과는 일부러 무시했다는 해석이나 앞으로 항상 연락하겠다는 약속에 동의하는 뜻이 아니다");
