@@ -3,7 +3,6 @@ import {
   api,
   ApiError,
   newKey,
-  PARTNER_OPTIONS,
   type Beat,
   type Exchange,
   type Partner,
@@ -13,6 +12,7 @@ import {
 } from "./api";
 import { ReportView } from "./Report";
 import { GiveupDialog } from "./GiveupDialog";
+import { PartnerDialog } from "./PartnerDialog";
 import { ChatNotice } from "./ChatNotice";
 import { KakaoPhone } from "./KakaoPhone";
 import { ResultSummary } from "./ResultSummary";
@@ -253,18 +253,13 @@ function Intro({
   shared: SharedResult | null;
   onStart: (g: StartResponse) => void;
 }) {
-  // 친구가 대화한 연인을 미리 골라 둔다 (바꿀 수 있다)
-  const [partner, setPartner] = useState<Partner | null>(
-    shared?.partner ?? null
-  );
+  const [partnerDialogOpen, setPartnerDialogOpen] = useState(false);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const chosen = PARTNER_OPTIONS.find((o) => o.key === partner);
 
-  const start = async () => {
-    if (!partner) return setError("대화할 연인을 골라 주세요.");
-    if (!consent) return setError("시작하려면 대화 기록 활용에 동의해 주세요.");
+  const start = async (partner: Partner) => {
+    setPartnerDialogOpen(false);
     setBusy(true);
     setError("");
     try {
@@ -283,6 +278,12 @@ function Intro({
     }
   };
 
+  const openPartnerDialog = () => {
+    if (!consent) return setError("시작하려면 대화 기록 활용에 동의해 주세요.");
+    setError("");
+    setPartnerDialogOpen(true);
+  };
+
   return (
     <main className="intro">
       <div className="intro-card">
@@ -295,7 +296,7 @@ function Intro({
             successShake={shared.successShake}
           />
         )}
-        <p className="intro-scene">
+        <p className="intro-scene intro-reveal intro-reveal-scene">
           <svg
             className="intro-scene-letter"
             viewBox="0 0 24 24"
@@ -322,34 +323,26 @@ function Intro({
             )
           )}
         </h1>
-        <p className="intro-lede">
-          오늘 팀장님한테 깨져서 기댈 곳이 필요했는데,{" "}
-          {chosen ? `연인 ${chosen.name}는` : "연인은"} 하루 종일 답이 없었어요.
+        <ol className="intro-message-timeline" aria-label="오늘 주고받은 메시지">
+          <li className="intro-message me">
+            <time>10:36</time>
+            <span className="intro-message-bubble">오늘 진짜 힘들다...</span>
+          </li>
+          <li className="intro-message me">
+            <time>16:25</time>
+            <span className="intro-message-bubble">뭐해?</span>
+          </li>
+          <li className="intro-message npc">
+            <span className="intro-message-bubble">미안</span>
+            <time>18:23</time>
+          </li>
+        </ol>
+        <p className="intro-lede intro-reveal intro-reveal-lede">
+          오늘 팀장님한테 깨져서 기댈 곳이 필요했는데, 연인은 하루 종일 답이 없었어요.
           <br />
           서운한 마음, 싸우지 않고 전할 수 있을까요?
         </p>
-        <fieldset className="partner">
-          <legend>누구와 이야기할까요?</legend>
-          <div className="partner-options">
-            {PARTNER_OPTIONS.map((o) => (
-              <label
-                key={o.key}
-                className={`partner-option ${partner === o.key ? "on" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="partner"
-                  value={o.key}
-                  checked={partner === o.key}
-                  onChange={() => (setPartner(o.key), setError(""))}
-                />
-                <span className="partner-label">{o.label}</span>
-                <span className="partner-name">{o.name}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <div className="intro-count" aria-live="polite">
+        <div className="intro-count intro-reveal intro-reveal-count" aria-live="polite">
           {stats && stats.best !== null ? (
             <>
               연인과 가장 잘 통한 기록은 <strong>{stats.best}%</strong>
@@ -364,21 +357,19 @@ function Intro({
             <>아직 기록이 없어요. 첫 기록을 세워 보세요.</>
           )}
         </div>
-        <section className="intro-rules" aria-label="대화 규칙">
+        <section className="intro-rules intro-reveal intro-reveal-rules" aria-label="대화 규칙">
           <p className="intro-rules-heading">
-            {chosen?.name ?? "상대"}에게 내 마음을 전할 기회는 단{" "}
+            상대에게 내 마음을 전할 기회는 단{" "}
             <strong>5번!</strong>
           </p>
           <p className="intro-rules-lede">
-            {chosen?.name ?? "상대"}의 사정도 들어 주면서, 오늘 서운했던 내
-            마음을 <strong>600자</strong> 안에 전해 보세요.
+            상대의 사정도 들어 주면서, 오늘 서운했던 내 마음을 <strong>600자</strong> 안에 전해 보세요.
           </p>
           <p className="intro-rules-note">
-            보낸 메시지는 수정할 수 없고, {chosen?.name ?? "상대"}와 얼마나
-            마음이 통했는지는 대화가 끝난 뒤 확인할 수 있어요.
+            보낸 메시지는 수정할 수 없고, 상대와 얼마나 마음이 통했는지는 대화가 끝난 뒤 확인할 수 있어요.
           </p>
         </section>
-        <label className="check">
+        <label className="check intro-reveal intro-reveal-consent">
           <input
             type="checkbox"
             checked={consent}
@@ -394,9 +385,14 @@ function Intro({
             {error}
           </p>
         )}
-        <button className="primary" onClick={start} disabled={busy}>
+        <button className="primary intro-reveal intro-reveal-start" onClick={openPartnerDialog} disabled={busy}>
           {busy ? "카페로 가는 중…" : "대화 시작하기"}
         </button>
+        <PartnerDialog
+          open={partnerDialogOpen}
+          onClose={() => setPartnerDialogOpen(false)}
+          onSelect={(partner) => void start(partner)}
+        />
       </div>
     </main>
   );
