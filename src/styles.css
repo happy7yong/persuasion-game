@@ -175,7 +175,7 @@ button:disabled {
   display: grid;
   gap: 8px;
   width: 100%;
-  margin: 0 0 20px;
+  margin: -4px 0 20px;
   padding: 0;
 }
 .intro-message {
