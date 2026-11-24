@@ -496,6 +496,7 @@ button:disabled {
 .kakao-avatar.seoa {
   background-position: 52% 40%;
 }
+.kakao-avatar.seoa,
 .kakao-avatar.yunjae {
   background-image: url("/yunjae-profile.jpeg");
   background-size: cover;
