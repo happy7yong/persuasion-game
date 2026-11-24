@@ -16,14 +16,14 @@ const goodNpc = JSON.stringify({ beats: [{ type: "dialogue", content: "응" }], 
 
 describe("시간 예산", () => {
   // 2026-11-23: 대사 기본값을 배포와 같은 Terra로 되돌렸다. 로컬 개발·평가의 Mini 기본값은 model-config.test.ts
-  it("상태 판정과 대사 생성은 모델을 따로 바꿀 수 있고, 기본값은 상태 판정 mini · 대사 Terra(배포와 같음)다", () => {
+  it("상태 판정과 대사 생성은 모델을 따로 바꿀 수 있고, 기본값은 상태 판정 mini · 대사 luna(배포와 같음, 2026-11-24 Terra에서 바꿈)다", () => {
     const old = { npc: process.env.NPC_MODEL, frame: process.env.FRAME_MODEL, dialogue: process.env.NPC_DIALOGUE_MODEL };
     delete process.env.NPC_MODEL;
     delete process.env.FRAME_MODEL;
     delete process.env.NPC_DIALOGUE_MODEL;
     try {
       expect(modelConfig("turn_frame").model).toBe("openai/gpt-5.4-mini");
-      expect(modelConfig("npc_turn").model).toBe("openai/gpt-5.6-terra");
+      expect(modelConfig("npc_turn").model).toBe("openai/gpt-5.6-luna");
       process.env.NPC_DIALOGUE_MODEL = "openai/gpt-5.4-mini";
       expect(modelConfig("npc_turn").model).toBe("openai/gpt-5.4-mini");
       expect(modelConfig("turn_frame").model).toBe("openai/gpt-5.4-mini");

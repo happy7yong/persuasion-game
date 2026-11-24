@@ -16,7 +16,7 @@
 //                                         # A 기존 엔진 · B 직접 해석(평가 전용 프롬프트)으로. 1차 결과는 A·B가 같이 쓴다.
 //                                         # 결과: 가린 비교표 + 정답 키(blind-key.json) + 해석 검토표
 //   npm run eval -- value [--runs 2] [--model 모델] [--only base|value]  # 가치 실험 (docs/character-intent.md §6). 윤재 첫 마디, 발화 4개를
-//                                         # 기존 Core / Core + 가치 단락으로. 대사 모델은 배포 모델(Terra), 1차는 발화마다 1회(두 조건 공통).
+//                                         # 기존 Core / Core + 가치 단락으로. 대사 모델은 배포 모델(PRODUCTION_DIALOGUE_MODEL), 1차는 발화마다 1회(두 조건 공통).
 //                                         # 결과: 가린 비교표 + 정답 키(value-key.json) + 검토표
 //   --label 이름                         # 결과 폴더 이름에 붙임
 //

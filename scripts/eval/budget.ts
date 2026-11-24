@@ -14,9 +14,10 @@ export type CallKind = "turn_frame" | "npc_turn" | "scene_check";
  */
 export const BASE_ESTIMATE: Record<CallKind, number> = { turn_frame: 0.00187, npc_turn: 0.00247, scene_check: 0.00064 };
 
-/** 대사 모델이 mini가 아니면 대사 호출 예상을 키운다 (Terra는 기준선에서 호출당 약 5배). 모르는 모델도 보수적으로 5배 */
+/** 모델별 호출 예상 배율: Mini 1 · luna 0.7 · Terra와 모르는 모델 5 */
 export function estimatesFor(models: Record<CallKind, string>): Record<CallKind, number> {
-  const factor = (m: string) => (/gpt-5\.4-mini/.test(m) ? 1 : 5);
+  // luna: 2026-11-24 실측 대사 호출당 약 $0.0016 (Mini 기준선 $0.00247의 약 0.65배). 모르는 모델은 보수적으로 5배
+  const factor = (m: string) => (/gpt-5\.4-mini/.test(m) ? 1 : /gpt-5\.6-luna/.test(m) ? 0.7 : 5);
   return {
     turn_frame: BASE_ESTIMATE.turn_frame * factor(models.turn_frame),
     npc_turn: BASE_ESTIMATE.npc_turn * factor(models.npc_turn),

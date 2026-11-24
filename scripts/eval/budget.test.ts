@@ -14,6 +14,7 @@ describe("계획과 확인", () => {
   });
   it("대사 모델이 mini가 아니면 대사 호출 예상을 키운다", () => {
     expect(estimatesFor({ ...mini, npc_turn: "openai/gpt-5.6-terra" }).npc_turn).toBeCloseTo(BASE_ESTIMATE.npc_turn * 5);
+    expect(estimatesFor({ ...mini, npc_turn: "openai/gpt-5.6-luna" }).npc_turn).toBeCloseTo(BASE_ESTIMATE.npc_turn * 0.7);
   });
   it("예상이 $0.10을 넘으면 --yes가 필요하다", () => {
     const p = emptyPlan();
