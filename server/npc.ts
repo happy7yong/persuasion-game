@@ -4,7 +4,7 @@ import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type Ll
 import { modelConfig } from "./model-config.js";
 import { buildSceneCheckPrompt, checkOutcome, parseSceneVerdict, reassertViolation, REF_USES, SCENE_JSON_SCHEMA, sceneTriggers, type AttemptCheck, type CheckOutcome, type Ref } from "./checks.js";
 import { factsLines, ISSUE_IDS, LEDGER_KINDS, ledgerLines, PLAYER_ACTS, applyFacts, resolveFacts, spokenLines, type LedgerItem, type TurnFacts } from "./ledger.js";
-import { band, chooseMove, isFinalTurn, STRATEGY_LABELS, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
+import { band, chooseMove, isFinalTurn, projectTurn, STRATEGY_LABELS, type GameState, type NpcMove, type StrategyLabel } from "./rules.js";
 
 const BeatSchema = z.object({
   type: z.enum(["narration", "dialogue"]),
@@ -166,7 +166,9 @@ export function buildNpcPrompt(
   facts?: TurnFacts,
   variant: CoreVariant = {},
 ): { system: string; user: string } {
-  const ledgerAfter = facts ? applyFacts(state.ledger, facts, state.turns.length + 1) : state.ledger;
+  const projected = facts ? projectTurn(state, facts, facts.evaluation.suggested_drop, isLabelList(facts.evaluation.labels)) : null;
+  const ledgerAfter = projected?.ledger ?? state.ledger;
+  const responseState = projected ? { ...state, score: projected.score, currentMind: projected.currentMind } : state;
   const partner = state.partner ?? "m";
   const finalTurn = isFinalTurn(state);
   // 순서: 매번 같은 부분(규칙·Core·장면·출력 형식·반복 금지)을 앞에, 매 마디 바뀌는 부분을 뒤에.
@@ -180,8 +182,9 @@ export function buildNpcPrompt(
     DIALOGUE_PRIORITIES,
     REPEAT_RULES,
     // ---- 여기부터 매 마디 바뀐다
-    `# 지금 상태\n${BAND_GUIDE[band(state.score)]}\n이번 말이 좋았다면 그만큼 반응에 드러내되, 지금 상태보다 한 단계 넘게 갑자기 바뀌지 않는다.`,
-    `# 지금 마음\n${mindLine(state)}\nCore의 성향대로 이 마음이 방금 말을 어떻게 듣게 하는지는 네가 판단한다.`,
+    `# 지금 상태\n${BAND_GUIDE[band(responseState.score)]}\n방금 말을 들은 뒤의 상태다. 변화는 말이나 행동에 드러날 수도, 아직 속에 남아 있을 수도 있다.`,
+    `# 지금 마음\n${mindLine(responseState)}\nCore의 성향대로 이 마음이 방금 말을 어떻게 듣게 하는지는 네가 판단한다.`,
+    projected && facts ? `# 방금 마음 변화\n${mindChangeLine(state, responseState, facts)}\n이 변화가 이번 반응에 어떤 영향을 줄지는 네가 판단한다. 변화한 축을 모두 말로 설명할 필요는 없다.` : null,
     `# 대화 장부 (이번 마디까지 확정된 사실)\n${ledgerLines(ledgerAfter, "npc")}`,
     facts ? `# 방금 플레이어의 말에서 확인된 것\n${factsLines(facts, ledgerAfter)}` : null,
     move === null && finalTurn
@@ -219,6 +222,19 @@ function conversationLines(state: GameState): string[] {
 function mindLine(state: GameState): string {
   const m = state.currentMind;
   return `피곤 ${m.fatigue}, 미안함 ${m.guilt}, 방어심 ${m.defensiveness}, 챙기고 싶은 마음 ${m.care}, 마음 열림 ${m.openness} (0~3)`;
+}
+
+/** 검증된 발화 인용과 이번 변화만 전달한다. 반응할 내용·방식은 NPC가 결정한다. */
+function mindChangeLine(before: GameState, after: GameState, facts: TurnFacts): string {
+  const axes = [
+    ["guilt", "미안함"], ["defensiveness", "방어심"], ["care", "챙기고 싶은 마음"], ["openness", "마음 열림"],
+  ] as const;
+  const changed = axes.flatMap(([key, label]) => before.currentMind[key] === after.currentMind[key]
+    ? [] : [`${label} ${before.currentMind[key]}→${after.currentMind[key]}`]);
+  if (!changed.length) return "변화 없음";
+  const acts = facts.acts.filter((a) => a.quote && ["apology", "feeling", "explain", "accept", "question", "propose", "promise", "accuse"].includes(a.act));
+  const evidence = [...new Set(acts.map((a) => a.quote))].slice(0, 2).map((quote) => `“${quote}”`).join(" · ");
+  return `${changed.join(" · ")}${evidence ? `\n계기가 된 이번 발화: ${evidence}` : ""}`;
 }
 
 /**
@@ -288,7 +304,8 @@ function beatLine(b: { type: string; content: string }) {
 // consolidate@3 (2026-11-24, core-values 브랜치): 윤재 Core를 성격·가치·믿음·바람·민감점 중심으로 정리했다. 행동 순서·반응을 정하던 문장(행동의 기본 순서, 마지막까지 유지, 먼저 짧게 사과, 해결책 먼저 제안 금지,
 // 할 수 있는 만큼만 답하기, 하루 재연 금지, 최우선 체크 등)을 뺐다. 성격·가치 문장은 그대로. 서아·BAND·chooseMove·점수는 그대로 (docs/character-intent.md §7)
 // consolidate@4 (2026-11-24, score-review 브랜치): 대사 프롬프트는 같다. 마음 규칙(nextMind)에 "플레이어가 사과하면 미안함↑"을 더했다 (결과 비교에서 구분하려고 버전을 올린다)
-export const NPC_PROMPT_VERSION = "consolidate@4";
+// consolidate@5 (2026-11-24, relationship-evidence 브랜치): 이번 발화를 반영한 마음·점수와 그 변화의 인용 근거를 대사 전에 보여 준다.
+export const NPC_PROMPT_VERSION = "consolidate@5";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
@@ -431,7 +448,7 @@ export async function replyFromFacts(state: GameState, playerText: string, facts
     ok: true,
     reply: {
       ...res.value,
-      facts,
+      facts: { ...facts, responseRefs: res.value.refs },
       checks,
       outcome: checkOutcome(checks),
       suggested: facts.evaluation.suggested_drop,

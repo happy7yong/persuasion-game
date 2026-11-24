@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildReport } from "./report.js";
 import { buildFactsPrompt, buildNpcPrompt, parseFacts, parseNpcOutput, scriptedReply } from "./npc.js";
-import { applyDrop, checkMessage, finish, newGame, recordTurn, RULES, type GameState, type StrategyLabel, type TurnFacts } from "./rules.js";
+import { applyDrop, checkMessage, finish, newGame, projectTurn, recordTurn, RULES, type GameState, type StrategyLabel, type TurnFacts } from "./rules.js";
 import { decodeState, encodeState } from "./token.js";
 
 const play = (drops: [string, number, StrategyLabel[]][]): GameState => {
@@ -11,6 +11,29 @@ const play = (drops: [string, number, StrategyLabel[]][]): GameState => {
 };
 
 describe("점수 규칙", () => {
+  it("답변 전에 이번 사과의 미안함 변화와 근거를 보여주고, 기록할 때 같은 상태·점수를 쓴다", () => {
+    const apology = (quote: string): TurnFacts => ({
+      v: 2, added: [], resolved: [], acts: [{ act: "apology", quote, refersTo: "" }],
+      evaluation: { suggested_drop: 4, labels: ["apology"], reason: "사과", noticed: "-", evidence: [quote] },
+    });
+    const first = apology("미안해");
+    const original = newGame("apology-projection", Date.now(), false);
+    const afterFirst = recordTurn(original, { player: "미안해", npc: [{ type: "dialogue", content: "응" }], facts: first, suggested: 4, labels: ["apology"] });
+    const second = apology("진짜 미안해");
+    const projected = projectTurn(afterFirst, second, 4, ["apology"]);
+    const prompt = buildNpcPrompt(afterFirst, "진짜 미안해", "counter", second);
+    expect(afterFirst.currentMind.guilt).toBe(2);
+    expect(projected.currentMind.guilt).toBe(3);
+    expect(prompt.system).toContain("미안함 3");
+    expect(prompt.system).toContain("미안함 2→3");
+    expect(prompt.system).toContain("계기가 된 이번 발화: “진짜 미안해”");
+    expect(prompt.system).toContain("변화한 축을 모두 말로 설명할 필요는 없다");
+    expect(afterFirst.currentMind.guilt).toBe(2); // 생성 전 상태는 변하지 않는다
+    const recorded = recordTurn(afterFirst, { player: "진짜 미안해", npc: [{ type: "dialogue", content: "왜 그렇게 미안해해?" }], facts: second, suggested: 4, labels: ["apology"] });
+    expect(recorded.currentMind).toEqual(projected.currentMind);
+    expect(recorded.score).toBe(projected.score);
+    expect(recorded.progress).toEqual(projected.progress);
+  });
   it("상태 점수는 처음 확정된 관계 변화에만 붙고 반복에는 붙지 않는다", () => {
     // 플레이어가 연인의 한계(L1)를 받아들이는 말: 점수 이벤트 + 방어심 하락
     const facts = (resolved: TurnFacts["resolved"]): TurnFacts => ({ v: 2, added: [], resolved, acts: [{ act: "accept", quote: "바로 못 볼 수 있지", refersTo: "L1" }], evaluation: { suggested_drop: 8, labels: ["empathy"], reason: "테스트", noticed: "테스트", evidence: [] } });

@@ -49,6 +49,8 @@ export interface TurnFacts {
   /** 이번 플레이어 말이 하는 일 */
   acts: { act: PlayerAct; quote: string; refersTo: string }[];
   evaluation: { suggested_drop: number; labels: string[]; reason: string; noticed: string; evidence: string[] };
+  /** 생성된 NPC 대사가 직접 다룬 장부 항목. 해당 턴의 대사와 함께 저장되어 마지막 턴도 추적한다. */
+  responseRefs?: { id: string; use: "assert" | "acknowledge" | "reference" | "reflect" }[];
   /**
    * 1차 출력 중 검증에서 버린 것과 이유 (인용이 원문에 없음, 없는 id, 권한 위반 등).
    * **진단 정보일 뿐이다.** 장부·감정·점수 계산과 대사 프롬프트에 쓰지 않는다. 없으면 버린 게 없다 (예전 기록도 없음).

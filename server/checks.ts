@@ -8,11 +8,11 @@ import type { LedgerItem } from "./ledger.js";
 
 // ------------------------------------------------------------------ V2 재주장
 
-export const REF_USES = ["assert", "acknowledge", "reference"] as const;
+export const REF_USES = ["assert", "acknowledge", "reference", "reflect"] as const;
 export type RefUse = (typeof REF_USES)[number];
 export interface Ref {
   id: string;
-  /** assert: 그 주장을 다시 내세움 · acknowledge: 받아들여진 것을 인정·고마워함 · reference: 지나가듯 언급 */
+  /** reflect: 플레이어가 말한 감정과 그 계기에 직접 응답함 (그 발화의 장부 항목) */
   use: RefUse;
 }
 
