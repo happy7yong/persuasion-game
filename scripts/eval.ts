@@ -3,7 +3,7 @@
 // 고정 입력(scripts/eval/cases.ts)에 돌리고, 지표를 세어 기준선으로 남긴다. DB에는 저장하지 않는다.
 //
 //   npm run eval                         # 기준선 전체: replay · cross · mind · ledger · scene · offline
-//   npm run eval -- replay [--runs 3] [--play yunjae|seoa] [--partner m|f] [--mind default|soft]
+//   npm run eval -- replay [--runs 3] [--play yunjae|seoa] [--partner m|f] [--mind default|soft] [--fixed-ids]
 //   npm run eval -- cross  [--runs 2]    # 같은 플레이어 말을 다른 연인에게 (H4 기준선)
 //   npm run eval -- mind   [--runs 2]    # 같은 대화를 다른 시작 마음으로 (H5 기준선)
 //   npm run eval -- ledger [--runs 5]    # 같은 발화를 1차에 반복 (H6 기준선: 기록 일관성·기대 일치)
@@ -205,7 +205,8 @@ interface RunResult {
 const INITIAL_IDS = new Set(["L1", "L2", "L3"]);
 
 async function replayRun(config: string, play: (typeof C.PLAYS)[number], partner: "m" | "f", mind: keyof typeof C.MIND_VARIANTS, run: number): Promise<RunResult> {
-  let s: GameState = newGame(`eval-${config}-${run}-${Date.now()}`, Date.now(), false, partner);
+  // --fixed-ids: 판 ID를 실행 시각 없이 정한다. 중간 마디 끝맺음(chooseMove)이 판 ID로 정해지므로, 프롬프트 전후 비교에서 같은 끝맺음 순서를 쓰게 한다
+  let s: GameState = newGame(argv.includes("--fixed-ids") ? `eval-${config}-${run}` : `eval-${config}-${run}-${Date.now()}`, Date.now(), false, partner);
   s = { ...s, currentMind: { ...C.MIND_VARIANTS[mind] } };
   const turns: TurnResult[] = [];
   let usdRun = 0;
