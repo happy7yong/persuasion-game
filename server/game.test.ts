@@ -128,7 +128,7 @@ describe("NPC 출력", () => {
     expect(p.user).toContain("안식처야");
     expect(p.system).toContain("단호하다");
     // B 형식: 2인칭, 말/행동 구분
-    expect(p.user).toContain("- 너 (말): 팀장님 얘기는");
+    expect(p.user).toContain("- 너 (말): 아까 답 늦은 건 미안해.");
     expect(p.user).toContain("- 플레이어 (말): 안식처야");
     expect(p.system).toContain("하지 말 것");
   });

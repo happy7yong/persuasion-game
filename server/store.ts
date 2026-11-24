@@ -125,7 +125,7 @@ export async function playFinished(playId: string): Promise<boolean> {
   return Boolean(rows[0]?.finished_at);
 }
 
-// ------------------------------------------------------------------ belief ("내가 본 너")
+// ------------------------------------------------------------------ belief (대화 돌아보기)
 
 export async function storedBelief(playId: string): Promise<unknown | null> {
   if (!storeEnabled()) return null;

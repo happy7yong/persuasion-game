@@ -44,13 +44,16 @@ export interface Report {
   weakestTurn: number | null;
 }
 
-/** 대화 결과 피드백 (server/belief.ts). 실제 플레이어 발화 인용을 근거로 한다. */
+/** 대화 결과 피드백 (server/belief.ts). 실제 발화와 연인의 속마음을 근거로 한다. */
 export interface Belief {
   kind: "feedback";
+  v: 3;
   npcName: string;
   summary: string;
-  points: { strength: string; turn: number; quote: string; improve: string; suggestion: string }[];
-  closing: string;
+  received: string;
+  gap: string;
+  direction: string;
+  evidence: { turn: number; playerQuote: string; thoughtQuote: string }[];
 }
 
 /** 은하 신문 1면 (server/headline.ts) */

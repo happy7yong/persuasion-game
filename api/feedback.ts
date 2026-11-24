@@ -1,4 +1,4 @@
-// "내가 본 너"에 대한 플레이어의 답: 맞아(agree) / 좀 달라(disagree).
+// 대화 피드백에 대한 플레이어의 답: 맞아(agree) / 좀 달라(disagree).
 // NPC의 해석이 실제 사람에게 맞게 느껴지는지 재는 데이터다 (docs/belief.md).
 import { z } from "zod";
 import { fail, guarded, parseRequest, send } from "../server/http.js";

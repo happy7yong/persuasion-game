@@ -124,7 +124,7 @@ for (const p of plays) {
     `- 상대: ${who} · 프롬프트 ${ts[0]?.prompt_version ?? "-"} · 모델 ${ts[0]?.model ?? "-"}`,
     `- 시작: ${kst(p.created_at)} / 종료: ${kst(p.finished_at)}`,
     `- 결과: ${p.outcome ?? "(안 끝남)"} / 최종 마음 지수: ${p.final_score ?? ts.at(-1)?.score_after} / 마디: ${ts.length} / 사용 글자: ${p.chars_used ?? "-"}`,
-    `- 게임을 미리 들었나: ${p.heard_before ?? "-"} · "내가 본 너" 피드백: ${p.belief_feedback ?? "-"}`,
+    `- 게임을 미리 들었나: ${p.heard_before ?? "-"} · 대화 피드백 응답: ${p.belief_feedback ?? "-"}`,
     `- LLM 호출 ${cs.length}회${failed.length ? ` (실패 ${failed.length}: ${failed.map((c) => c.result).join(", ")})` : ""}, 비용 $${cost.toFixed(5)}`,
     "",
     "## 대화",
@@ -144,7 +144,7 @@ for (const p of plays) {
       for (const m of msgs) out.push("", `<details><summary>프롬프트 · ${m.role}</summary>`, "", "```", m.content, "```", "</details>");
     }
   }
-  for (const [title, v] of [["내가 본 너", p.belief], ["은하 신문", p.headline], ["엔딩 리포트", p.ending]] as const) {
+  for (const [title, v] of [["대화 돌아보기", p.belief], ["은하 신문", p.headline], ["엔딩 리포트", p.ending]] as const) {
     if (v) out.push("", `## ${title}`, "", "```json", JSON.stringify(v, null, 2), "```");
   }
   const file = `play-${p.id.slice(0, 8)}.md`;

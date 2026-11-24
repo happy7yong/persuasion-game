@@ -91,7 +91,7 @@ export function modelConfig(call: CallType): CallModelConfig {
       reasoningNone: true,
     };
   }
-  // "내가 본 너": 대화가 끝난 뒤 한 번. 리포트를 먼저 보여 주고 뒤에서 생성한다.
+  // 대화 돌아보기: 대화가 끝난 뒤 한 번. 리포트를 먼저 보여 주고 뒤에서 생성한다.
   return {
     model: process.env.BELIEF_MODEL || process.env.NPC_MODEL || "openai/gpt-5.4-mini",
     maxTokens: 800,

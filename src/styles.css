@@ -277,17 +277,40 @@ button:disabled {
 
 /* chat */
 .chat {
+  position: relative;
+  isolation: isolate;
   max-width: 480px;
   margin: 0 auto;
   min-height: 100svh;
   padding: 0 14px 220px;
+}
+.chat::before,
+.chat::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, 480px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.chat::before {
+  z-index: -2;
+  background: url("/cafe-background.png") center / cover no-repeat;
+  filter: blur(7px);
+  clip-path: inset(0);
+}
+.chat::after {
+  z-index: -1;
+  background: rgba(255, 249, 239, 0.18);
 }
 .chat-head {
   position: sticky;
   top: 0;
   z-index: 2;
   margin-inline: -14px;
-  background: rgba(237, 248, 250, 0.42);
+  background: rgba(255, 249, 239, 0.58);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   display: flex;
@@ -306,55 +329,111 @@ button:disabled {
   font-size: 13px;
   color: var(--muted);
 }
-.chat-meter {
-  text-align: right;
-  font-size: 13px;
-  color: var(--muted);
-  display: grid;
-  gap: 4px;
-  justify-items: end;
+.chat-giveup {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .chat-turn {
   color: var(--ink);
   font-weight: 700;
   font-size: 14px;
 }
-.budget {
-  width: 120px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--line);
-  overflow: hidden;
-}
-.budget-fill {
-  height: 100%;
-  background: var(--ink);
-  transition: width 0.4s ease;
+.chat-left {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .kakao {
-  margin: 14px 0 6px;
-  background: rgba(255, 250, 246, 0.76);
-  border: 0;
-  border-radius: 16px;
-  padding: 10px 12px;
+  width: min(100%, 360px);
+  margin: 14px auto 0;
+  overflow: hidden;
+  background: rgb(255, 250, 246);
+  border: 4px solid #000;
+  border-radius: 28px;
 }
-.kakao-toggle {
-  background: none;
-  border: 0;
+.kakao-phone-top {
+  height: 19px;
+  display: grid;
+  place-items: center;
+}
+.kakao-phone-speaker {
+  width: 48px;
+  height: 4px;
+  background: #000;
+  border-radius: 999px;
+}
+.kakao-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px 11px;
+}
+.kakao-avatar {
+  display: inline-block;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 12px;
+  background-image: url("/cafe-background.png");
+  background-size: 400% auto;
+}
+.kakao-avatar.seoa {
+  background-position: 52% 40%;
+}
+.kakao-avatar.yunjae {
+  background-image: url("/yunjae-profile.jpeg");
+  background-size: cover;
+  background-position: center;
+}
+.kakao-header .kakao-avatar {
+  width: 40px;
+  height: 40px;
+}
+.kakao-header-person {
+  flex: 1;
+  display: grid;
+  line-height: 1.35;
+}
+.kakao-header-person strong {
+  font-size: 15px;
+}
+.kakao-header-person span {
   color: var(--muted);
-  font-size: 13px;
-  padding: 2px 0;
+  font-size: 11px;
+}
+.kakao-screen {
+  border-top: 1px solid var(--line);
+  padding: 12px 10px 14px;
 }
 .kakao-list {
   list-style: none;
-  margin: 8px 0 2px;
+  margin: 0;
   padding: 0;
   display: grid;
-  gap: 6px;
+  gap: 10px;
 }
 .kakao-row {
-  display: grid;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.kakao-row.me {
+  justify-content: flex-end;
+}
+.kakao-message {
+  min-width: 0;
+  max-width: calc(100% - 42px);
+  display: flex;
+  flex-direction: column;
+}
+.kakao-row.me .kakao-message {
+  align-items: flex-end;
+}
+.kakao-sender {
+  margin-bottom: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
 }
 .kakao-line {
   display: flex;
@@ -365,23 +444,28 @@ button:disabled {
   flex-direction: row-reverse;
 }
 .kakao-bubble {
-  max-width: 76%;
+  max-width: min(100%, 240px);
   padding: 7px 11px;
   border-radius: 14px;
   font-size: 14px;
   background: var(--white);
+  overflow-wrap: anywhere;
+}
+.kakao-row.npc .kakao-bubble {
+  border: 1px solid var(--line);
 }
 .kakao-row.me .kakao-bubble {
   background: #ffcbc5;
-  color: var(--black);
+  color: var(--ink);
 }
 .kakao-line time {
+  flex: none;
   font-size: 11px;
   color: var(--muted);
 }
 .kakao-read {
   width: fit-content;
-  justify-self: center;
+  align-self: center;
   font-size: 11px;
   font-weight: 700;
   color: #7a4d48;
@@ -390,19 +474,30 @@ button:disabled {
   padding: 3px 7px;
   margin-top: 4px;
 }
-.kakao-note {
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
-}
-
 .thread {
   list-style: none;
   padding: 8px 0 0;
   margin: 0;
   display: grid;
   gap: 10px;
+}
+.chat-note {
+  justify-self: stretch;
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255, 249, 239);
+  color: var(--ink);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-note strong {
+  color: var(--muted);
+  font-size: 14px;
 }
 .bubble {
   max-width: 82%;
@@ -417,16 +512,19 @@ button:disabled {
   justify-self: start;
 }
 .bubble.me {
-  background: #bb7068;
+  background: #612018;
   color: var(--white);
   border-bottom-right-radius: 6px;
   justify-self: end;
 }
 .beat-narr {
-  color: var(--muted);
+  width: fit-content;
+  color: white;
+  /* background: rgba(255, 249, 239, 0.78); */
+  border-radius: 12px;
   font-size: 14px;
   font-style: italic;
-  padding: 0 4px;
+  padding: 6px 10px;
   animation: pop 0.25s ease-out;
 }
 .typing {
@@ -456,7 +554,7 @@ button:disabled {
   align-items: center;
   gap: 12px;
   margin: 4px 0 24px;
-  color: var(--muted);
+  color: #fff;
   font-size: 14px;
   animation: pop 0.4s ease-out 0.6s both;
 }
@@ -475,7 +573,7 @@ button:disabled {
   margin: 26px 0;
   text-align: center;
   font-weight: 700;
-  color: var(--cobalt);
+  color: #fff;
   letter-spacing: -0.01em;
   animation: pop 0.6s ease-out;
 }
@@ -513,18 +611,75 @@ button:disabled {
 .composer-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-top: 8px;
+}
+.composer-bar > :not(button) {
+  white-space: nowrap;
+}
+.composer-bar .primary.small {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .count {
   font-size: 13px;
   color: var(--muted);
-  margin-right: auto;
   font-variant-numeric: tabular-nums;
 }
 .count.over {
   color: #c0264f;
   font-weight: 700;
+}
+.composer-key-hint {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 440px) {
+  .composer-key-hint {
+    display: none;
+  }
+}
+@media (max-width: 360px) {
+  .composer-bar {
+    gap: 6px;
+  }
+  .composer-bar .count,
+  .composer-bar .chat-left,
+  .composer-bar .chat-turn {
+    font-size: 12px;
+  }
+  .composer-bar .primary.small {
+    padding-inline: 12px;
+  }
+}
+/* 로컬 채팅 화면 미리보기 (?dev=chat) */
+.dev-chat-tools {
+  padding: 18px 2px 14px;
+}
+.dev-chat-tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--ink);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+}
+.dev-chat-tools p {
+  margin: 8px 0;
+  color: var(--white);
+  font-size: 13px;
+  text-shadow: 0 1px 4px rgba(34, 15, 7, 0.8);
+}
+.dev-chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dev-chat-selected {
+  background: var(--cobalt);
+  color: var(--white);
 }
 /* 작은 알약 버튼 */
 .chip {
@@ -718,6 +873,12 @@ button:disabled {
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1.4;
+}
+.report-title-result {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
 }
 .report-number {
   display: block;
@@ -1066,20 +1227,31 @@ button:disabled {
   font-weight: 700;
   line-height: 1.5;
 }
-.belief-points {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.belief-flow {
   display: grid;
   gap: 14px;
 }
-.belief-points li {
+.belief-flow > div {
+  border-top: 1px solid var(--line);
   padding-top: 14px;
 }
-.belief-claim {
-  margin: 0 0 8px;
+.belief-flow h3,
+.belief-evidence h3,
+.belief-direction h3 {
+  margin: 0 0 5px;
+  font-size: 14px;
   font-weight: 700;
-  font-size: 16px;
+}
+.belief-flow p,
+.belief-direction p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.belief-evidence {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
 }
 .evidence {
   display: grid;
@@ -1100,34 +1272,15 @@ button:disabled {
 .evidence-quote {
   font-size: 14px;
 }
-.belief-why {
-  margin: 8px 0 0;
-  font-size: 14px;
+.evidence-thought {
+  font-size: 13px;
   color: var(--muted);
 }
-.belief-suggestion {
-  margin: 0 0 13px;
-  padding: 13px 14px;
-  border-radius: 9px;
-  background: #f6ece6;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.55;
-}
-.belief-suggestion span {
-  display: block;
-  margin-bottom: 5px;
-  color: #9c4a45; /* 강조색을 어둡게: 작은 글씨라 대비 4.5:1 이상 */
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-.belief-expect {
-  margin: 18px 0 0;
+.belief-direction {
+  margin-top: 20px;
   padding: 12px 14px;
   border-radius: 10px;
   background: #f6ece6;
-  font-size: 15px;
 }
 .belief-feedback {
   margin-top: 18px;

@@ -13,8 +13,15 @@ import {
 } from "./api";
 import { ReportView } from "./Report";
 import { GiveupDialog } from "./GiveupDialog";
+import { ChatNotice } from "./ChatNotice";
+import { KakaoPhone } from "./KakaoPhone";
 import { ResultSummary } from "./ResultSummary";
-import { clearSharedParams, DEV_SHARED, readSharedResult, type SharedResult } from "./share";
+import {
+  clearSharedParams,
+  DEV_SHARED,
+  readSharedResult,
+  type SharedResult,
+} from "./share";
 import { MIN_FOR_COUNT, sampleDistribution } from "./rank";
 import { tag, tagPlay, track } from "./clarity";
 import {
@@ -96,7 +103,8 @@ export function App() {
   const [stats, setStats] = useState<Stats | null>(null);
   // 공유 링크로 들어왔으면 첫 화면에 친구의 결과를 보여 준다. ?dev=shared 는 개발자용 예시.
   const [shared] = useState<SharedResult | null>(() =>
-    import.meta.env.DEV && new URLSearchParams(window.location.search).get("dev") === "shared"
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get("dev") === "shared"
       ? DEV_SHARED
       : readSharedResult()
   );
@@ -125,7 +133,13 @@ export function App() {
       <>
         <ReportView
           report={DEV_REPORT}
-          stats={{ total: 18, finished: 18, persuaded: 7, best: 71, distribution: sampleDistribution() }}
+          stats={{
+            total: 18,
+            finished: 18,
+            persuaded: 7,
+            best: 71,
+            distribution: sampleDistribution(),
+          }}
           token=""
           preview
           onRetry={() => window.location.assign(window.location.pathname)}
@@ -188,45 +202,45 @@ export function App() {
 /** 결과 화면 아래 "설계 참고". 문의 푸터는 2026-11-24에 뺐다 */
 function DesignNotes() {
   return (
-        <aside className="design-notes" aria-label="피드백 설계 참고">
-          <p className="design-notes-title">설계 참고</p>
-          <p>
-            이 피드백은 관계를 진단하거나 정답을 판정하지 않아요. 실제 발화와
-            상대가 유지한 입장을 바탕으로 대화의 흐름을 돌아보기 위한 장치예요.
-          </p>
-          <ul>
-            <li>
-              <a
-                href="https://academic.oup.com/edited-volume/38162/chapter/332989072"
-                target="_blank"
-                rel="noreferrer"
-              >
-                파트너 반응성
-              </a>{" "}
-              — 이해, 인정, 돌봄이 관계 경험에 미치는 과정
-            </li>
-            <li>
-              <a
-                href="https://doi.org/10.1037/0033-2909.119.2.254"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Kluger &amp; DeNisi (1996)
-              </a>{" "}
-              — 사람 자체보다 행동과 과제에 초점을 둔 피드백
-            </li>
-            <li>
-              <a
-                href="https://www.tandfonline.com/doi/full/10.1080/08975353.2015.1038962"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Gottman et al.
-              </a>{" "}
-              — 갈등에서 공격과 방어를 협력으로 돌리는 repair 과정
-            </li>
-          </ul>
-        </aside>
+    <aside className="design-notes" aria-label="피드백 설계 참고">
+      <p className="design-notes-title">설계 참고</p>
+      <p>
+        이 피드백은 관계를 진단하거나 정답을 판정하지 않아요. 실제 발화와 상대가
+        유지한 입장을 바탕으로 대화의 흐름을 돌아보기 위한 장치예요.
+      </p>
+      <ul>
+        <li>
+          <a
+            href="https://academic.oup.com/edited-volume/38162/chapter/332989072"
+            target="_blank"
+            rel="noreferrer"
+          >
+            파트너 반응성
+          </a>{" "}
+          — 이해, 인정, 돌봄이 관계 경험에 미치는 과정
+        </li>
+        <li>
+          <a
+            href="https://doi.org/10.1037/0033-2909.119.2.254"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Kluger &amp; DeNisi (1996)
+          </a>{" "}
+          — 사람 자체보다 행동과 과제에 초점을 둔 피드백
+        </li>
+        <li>
+          <a
+            href="https://www.tandfonline.com/doi/full/10.1080/08975353.2015.1038962"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Gottman et al.
+          </a>{" "}
+          — 갈등에서 공격과 방어를 협력으로 돌리는 repair 과정
+        </li>
+      </ul>
+    </aside>
   );
 }
 
@@ -240,7 +254,9 @@ function Intro({
   onStart: (g: StartResponse) => void;
 }) {
   // 친구가 대화한 연인을 미리 골라 둔다 (바꿀 수 있다)
-  const [partner, setPartner] = useState<Partner | null>(shared?.partner ?? null);
+  const [partner, setPartner] = useState<Partner | null>(
+    shared?.partner ?? null
+  );
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -307,7 +323,8 @@ function Intro({
           )}
         </h1>
         <p className="intro-lede">
-          오늘 팀장님한테 깨져서 기댈 곳이 필요했는데, {chosen ? `연인 ${chosen.name}는` : "연인은"} 하루 종일 답이 없었어요.
+          오늘 팀장님한테 깨져서 기댈 곳이 필요했는데,{" "}
+          {chosen ? `연인 ${chosen.name}는` : "연인은"} 하루 종일 답이 없었어요.
           <br />
           서운한 마음, 싸우지 않고 전할 수 있을까요?
         </p>
@@ -349,13 +366,16 @@ function Intro({
         </div>
         <section className="intro-rules" aria-label="대화 규칙">
           <p className="intro-rules-heading">
-            {chosen?.name ?? "상대"}에게 내 마음을 전할 기회는 단 <strong>5번!</strong>
+            {chosen?.name ?? "상대"}에게 내 마음을 전할 기회는 단{" "}
+            <strong>5번!</strong>
           </p>
           <p className="intro-rules-lede">
-            {chosen?.name ?? "상대"}의 사정도 들어 주면서, 오늘 서운했던 내 마음을 <strong>600자</strong> 안에 전해 보세요.
+            {chosen?.name ?? "상대"}의 사정도 들어 주면서, 오늘 서운했던 내
+            마음을 <strong>600자</strong> 안에 전해 보세요.
           </p>
           <p className="intro-rules-note">
-            보낸 메시지는 수정할 수 없고, {chosen?.name ?? "상대"}와 얼마나 마음이 통했는지는 대화가 끝난 뒤 확인할 수 있어요.
+            보낸 메시지는 수정할 수 없고, {chosen?.name ?? "상대"}와 얼마나
+            마음이 통했는지는 대화가 끝난 뒤 확인할 수 있어요.
           </p>
         </section>
         <label className="check">
@@ -379,38 +399,6 @@ function Intro({
         </button>
       </div>
     </main>
-  );
-}
-
-function KakaoCard({ game }: { game: StartResponse }) {
-  const [open, setOpen] = useState(true);
-  return (
-    <section className="kakao">
-      <button
-        className="kakao-toggle"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-      >
-        오늘 주고받은 메시지 {open ? "접기" : "보기"}
-      </button>
-      {open && (
-        <ol className="kakao-list">
-          {game.scenario.kakao.map((k, i) => (
-            <li key={i} className={`kakao-row ${k.from}`}>
-              <div className="kakao-line">
-                <span className="kakao-bubble">{k.text}</span>
-                <time>{k.time}</time>
-              </div>
-              {k.readAt && <div className="kakao-read">읽음 {k.readAt}</div>}
-            </li>
-          ))}
-          <li className="kakao-note">
-            약 8시간 반 동안 답장 없음, 15:32에 한 번 읽음, 그 사이 보낸
-            메시지 7개
-          </li>
-        </ol>
-      )}
-    </section>
   );
 }
 
@@ -604,7 +592,6 @@ function Chat({
 
   const msgLen = chars(text);
   const over = msgLen > rules.messageMax || msgLen > session.left;
-  const pct = Math.max(0, (session.left / rules.charBudget) * 100);
 
   const noticeView = notice && (
     <div
@@ -640,37 +627,27 @@ function Chat({
             오늘 낮, 답장이 없었던 일을 두고 마주 앉아 있어요.
           </p>
         </div>
-        <div className="chat-meter">
-          <span className="chat-turn">
-            {Math.min(session.turns + 1, rules.maxTurns)}/{rules.maxTurns}번째
-            말
-          </span>
-          <div
-            className="budget"
-            role="meter"
-            aria-label="남은 발언권"
-            aria-valuemin={0}
-            aria-valuemax={rules.charBudget}
-            aria-valuenow={session.left}
-          >
-            <div className="budget-fill" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="chat-left">발언권 {session.left}자</span>
-        </div>
+        <button
+          className="chip chip-quiet chat-giveup"
+          onClick={() => setConfirmGiveup(true)}
+          disabled={busy || closing}
+        >
+          포기하기
+        </button>
       </header>
 
-      <KakaoCard game={game} />
+      <KakaoPhone
+        kakao={scenario.kakao}
+        npcName={scenario.npcName}
+      />
 
       <ol className="thread" aria-live="polite" data-clarity-unmask="true">
+        <ChatNotice />
         {msgs.map((m) =>
           m.beat.type === "narration" ? (
-            <li key={m.id} className="beat-narr">
-              {m.beat.content}
-            </li>
+            <li key={m.id} className="beat-narr">{m.beat.content}</li>
           ) : (
-            <li key={m.id} className={`bubble ${m.who}`}>
-              {m.beat.content}
-            </li>
+            <li key={m.id} className={`bubble ${m.who}`}>{m.beat.content}</li>
           )
         )}
         {typing && (
@@ -705,16 +682,6 @@ function Chat({
               if (notice?.kind === "error" && notice.action !== "restart")
                 setNotice(null);
             }}
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing
-              ) {
-                e.preventDefault();
-                if (!busy) void send();
-              }
-            }}
             placeholder={busy ? "" : `${scenario.npcName}에게 하고 싶은 말`}
             rows={3}
             disabled={busy || notice?.action === "restart"}
@@ -725,13 +692,10 @@ function Chat({
             <span className={`count ${over ? "over" : ""}`}>
               {msgLen}/{Math.min(rules.messageMax, session.left)}자
             </span>
-            <button
-              className="chip chip-quiet"
-              onClick={() => setConfirmGiveup(true)}
-              disabled={busy}
-            >
-              포기하기
-            </button>
+            <span className="chat-left">발언권 {session.left}자</span>
+            <span className="chat-turn">
+              {Math.min(session.turns + 1, rules.maxTurns)}/{rules.maxTurns}번째 말
+            </span>
             <button
               className="primary small"
               onClick={() => void send()}

@@ -11,7 +11,8 @@ export type Partner = keyof typeof PARTNERS;
 export const PARTNER_KEYS = Object.keys(PARTNERS) as Partner[];
 
 /** 원문의 "윤재"를 고른 연인의 이름으로 바꾼다. */
-export const forPartner = (text: string, partner: Partner): string => text.replaceAll("윤재", PARTNERS[partner].name);
+export const forPartner = (text: string, partner: Partner): string =>
+  text.replaceAll("윤재", PARTNERS[partner].name);
 
 export const SCENARIO = {
   title: "우리 얘기 좀 해",
@@ -26,14 +27,30 @@ export const SCENARIO = {
     { time: "15:52", from: "me", text: "??" },
     { time: "16:40", from: "me", text: "저녁에 볼 수 있는 거지?" },
     { time: "17:35", from: "me", text: "나 무시해?" },
-    { time: "18:52", from: "npc", text: "미안 회의 연달아 있었어. 이따 카페에서 봐" },
+    {
+      time: "18:52",
+      from: "npc",
+      text: "미안 회의 연달아 있었어. 이따 카페에서 봐",
+    },
   ],
   opening: [
-    { type: "narration" as const, content: "윤재가 라떼 두 잔을 내려놓고 맞은편 의자에 털썩 앉는다. 네 잔에는 이미 빨대가 꽂혀 있다." },
-    { type: "dialogue" as const, content: "팀장님 얘기는 이따 마저 하자. 그건 진짜 열받았겠다." },
-    { type: "narration" as const, content: "빨대를 몇 번 휘젓다가 손을 멈춘다." },
-    { type: "dialogue" as const, content: "근데 '나 무시해?'는 좀… 나 오늘 회의 네 개 연달아 들어갔어. 화장실도 겨우 갔다고." },
-    { type: "dialogue" as const, content: "일할 땐 오늘처럼 답 늦을 때도 있어." },
+    {
+      type: "narration" as const,
+      content:
+        "윤재가 라떼 두 잔을 내려놓고 맞은편 의자에 털썩 앉는다. 잔에는 이미 빨대가 꽂혀 있다.",
+    },
+    {
+      type: "dialogue" as const,
+      content: "아까 답 늦은 건 미안해.",
+    },
+    {
+      type: "narration" as const,
+      content: "빨대를 만지작거리다 손을 멈춘다.",
+    },
+    {
+      type: "dialogue" as const,
+      content: "근데 '나 무시해?'는 좀… 그 말은 서운했어.",
+    },
   ],
 };
 
@@ -42,7 +59,7 @@ export const SCENE_FACTS = [
   "오늘 너는 분기 보고 때문에 회의가 네 개 연달아 있었다. 점심도 회의하면서 샌드위치로 때웠다.",
   "10:13에 'ㅇㅇ 고마워 바쁠 듯'을 보낸 뒤 18:52까지 약 8시간 반 동안 답장하지 않았다.",
   "그 사이 플레이어는 메시지 7개를 보냈다. 너는 15:10의 '바빠?'만 15:32에 읽었다. 그 뒤 회의가 다시 이어져 다른 메시지는 읽지 못한 채 18:52에 답장했다.",
-  "15:32에 읽은 '바빠?'에는 짧게 답하면 대화를 더 대충 넘기는 것 같아 저녁 카페에서 제대로 얘기하자고 답장을 미뤘다. 그 판단을 플레이어에게 미리 알리지는 않았다. 다른 메시지는 아직 읽지 않은 것으로 보인다.",
+  "15:32에 읽은 '바빠?'에는 짧게 답하면 대화를 더 대충 넘기는 것 같아 저녁 카페에서 제대로 얘기하자고 답장을 미뤘다. 그 판단을 플레이어에게 미리 알리지는 않았다. 18:52에 답장한 뒤 카페에 오기 전에 나머지 메시지를 확인했다.",
   "18:52에야 '미안 회의 연달아 있었어. 이따 카페에서 봐'라고 답했다.",
   "지금은 금요일 밤, 동네 카페에서 마주 앉아 있다. 라떼 두 잔은 네가 시켰다. 너는 이미 위의 첫마디를 했다.",
 ];
@@ -193,11 +210,17 @@ const SEOA_CORE_TEMPLATE = `# 인물 Core: 윤재
 
 상대 말을 평가하거나 상담가처럼 정리하지 않는다. "그 정도면", "알아듣겠어", "그러니까 네 말은"처럼 요약해 되풀이하지 않는다. 한 차례에는 먼저 반응하고 싶은 한 지점에 반응하며, 기본 대사는 1~2개로 끝낸다. 다정함은 말뿐 아니라 태도에도 드러난다. 이모지는 쓰지 않는다.`;
 
-export const BAND_GUIDE: Record<"firm" | "wavering" | "seeking" | "accepting", string> = {
+export const BAND_GUIDE: Record<
+  "firm" | "wavering" | "seeking" | "accepting",
+  string
+> = {
   firm: "지금 너의 마음: 단호하다. 작은 지적은 인정해도 핵심 입장(하루 종일 연락할 필요는 없다)은 바꾸지 않는다.",
-  wavering: "지금 너의 마음: 흔들리고 있다. 말끝이 흐려지고, 상대 말이 맞을 수도 있다는 기색이 보인다. 하지만 핵심 입장은 아직 바꾸지 않고, 합의도 하지 않는다.",
-  seeking: "지금 너의 마음: 많이 흔들렸다. 상대가 낸 말이나 방법을 더 고려하게 된다. 그래도 마지막 마디 전에는 조건부 수긍이나 합의로 끝내지 않는다. 네가 먼저 해결책을 내지는 않는다.",
-  accepting: "지금 너의 마음: 상대 말에서 실제로 납득한 부분을 짧은 말이나 행동으로 드러낸다. 그래도 마지막 마디 전에는 핵심 입장을 완전히 접거나 합의하지 않는다. 마지막 마디에서만 이번 대화 전체와 마지막 말을 보고 결정한다.",
+  wavering:
+    "지금 너의 마음: 흔들리고 있다. 말끝이 흐려지고, 상대 말이 맞을 수도 있다는 기색이 보인다. 하지만 핵심 입장은 아직 바꾸지 않고, 합의도 하지 않는다.",
+  seeking:
+    "지금 너의 마음: 많이 흔들렸다. 상대가 낸 말이나 방법을 더 고려하게 된다. 그래도 마지막 마디 전에는 조건부 수긍이나 합의로 끝내지 않는다. 네가 먼저 해결책을 내지는 않는다.",
+  accepting:
+    "지금 너의 마음: 상대 말에서 실제로 납득한 부분을 짧은 말이나 행동으로 드러낸다. 그래도 마지막 마디 전에는 핵심 입장을 완전히 접거나 합의하지 않는다. 마지막 마디에서만 이번 대화 전체와 마지막 말을 보고 결정한다.",
 };
 
 export const SCORING_RUBRIC = `# 플레이어 발화 평가 (대화 중에는 플레이어에게 보이지 않음)
@@ -213,7 +236,7 @@ export const SCORING_RUBRIC = `# 플레이어 발화 평가 (대화 중에는 �
 labels: 이번 **플레이어 발화 자체**에서 뚜렷하게 드러난 것만 고른다(보통 1~2개). NPC의 답변·현재 마음·관계 상태를 근거로 라벨을 보태지 않는다. 물음표가 있다고 question이 아니다. 진짜로 상대 생각을 물을 때만 question. logic(논리·근거), emotion(솔직한 감정), question(상대 생각 묻기), compromise(구체적 타협안), apology(사과·인정), empathy(상대 입장 이해), humor(장난·유머), pressure(압박·비난·죄책감·반복).
 reason: suggested_drop을 준 판단 근거를 80자 이내로 쓴다. 플레이어 발화가 윤재의 유지 입장에 답했는지, 어떤 점이 설득력이 있거나 부족했는지를 구체적으로 적는다. NPC가 아직 하지 않은 사과·대사·행동을 근거에 넣지 않는다.
 evidence: reason을 뒷받침하는 플레이어 원문의 짧은 부분만 최대 2개 적는다. 원문에 없는 말은 쓰지 않는다.
-noticed: 이번 말에서 **플레이어에 대해 새로 알게 된 것** 한 줄(30자 이내). 대화가 끝난 뒤 "내가 본 너"를 말할 때 근거가 된다.
+noticed: 이번 말에서 **플레이어에 대해 새로 알게 된 것** 한 줄(30자 이내). 대화가 끝난 뒤 전체 대화를 돌아볼 때 참고한다.
 - 플레이어가 이번에 실제로 한 말과 그 방식에서 보이는 것만. 예: "서운한 건 돌려 말하지 않음", "방법부터 꺼냄", "내 하루를 먼저 궁금해함".
 - 성격 유형·심리 진단 금지(MBTI, 애착 유형 등). 대화에 없던 과거나 습관을 지어내지 않는다. 새로 알게 된 게 없으면 "아직 잘 모르겠음".`;
 
@@ -252,7 +275,7 @@ JSON 객체 하나만 쓴다. 적힌 순서대로 쓴다: 먼저 듣고 판단�
  */
 export const EXPERIENCE_OUTPUT_FORMAT = APPRAISAL_OUTPUT_FORMAT.replace(
   '{"heard":"...","shift":',
-  '{"heard":"...","focus":"...","belief":"...","standard":["...","..."],"shift":',
+  '{"heard":"...","focus":"...","belief":"...","standard":["...","..."],"shift":'
 ).replace(
   /^(- heard: .*)$/m,
   [
@@ -260,7 +283,7 @@ export const EXPERIENCE_OUTPUT_FORMAT = APPRAISAL_OUTPUT_FORMAT.replace(
     "- focus: 방금 말에서 네가 가장 크게 본 것 한 줄(40자 이내). 그 말의 어느 부분, 또는 어떤 면이었는지.",
     "- belief: 지금 플레이어에 대해 네가 생각하는 것 한 줄(60자 이내).",
     "- standard: 이런 말을 들었을 때 지금 너는 무엇을 보고 판단하는지, 중요한 순서대로 1~3개(각 30자 이내). 이번 말에 대한 감상이 아니라 판단의 기준을 적는다.",
-  ].join("\n"),
+  ].join("\n")
 );
 
 /** B의 우선순위. DIALOGUE_PRIORITIES에서 2번(장부 상태의 의미)만 바꾼다. 1·3·4번은 같다. */
@@ -271,13 +294,15 @@ export const APPRAISAL_PRIORITIES = `# 무엇을 먼저 따르나
 4. 표현: 말투·감정·새로운 반응은 그다음이다.`;
 
 /** 서버가 고른 끝맺음 방식. 질문은 "ask"일 때만 허용한다. */
-export const MOVE_GUIDE: Record<"counter" | "ask" | "concede" | "linger", string> = {
+export const MOVE_GUIDE: Record<
+  "counter" | "ask" | "concede" | "linger",
+  string
+> = {
   counter:
     "반론: 직전 플레이어 말의 한 지점에 네 사정·억울함·걱정을 네 말투로 받아친다. 이번 반응의 중심에는 네가 아직 받아들이지 않은 것이 있다. 그걸 설명하거나 매번 말로 꺼낼 필요는 없다. 그 입장은 장면과 대화 장부에서 아직 열려 있는 네 항목에서 가져오며, 새 사실을 만들지 않는다. 기본 대사는 1~2개로 끝낸다. 굳이 먼저 인정하고 시작할 필요는 없다. 아직 말하지 않은 구체적인 일상은 필요할 때만 하나 덧붙인다. 새로 보탤 말이 없으면 짧게 끝낸다. 플레이어가 먼저 꺼내지 않았다면 해결책·약속·규칙을 제안하지 않는다. 질문으로 끝내지 않는다. 마지막 문장은 물음표 없이 끝난다. 날은 세우지 않는다: 웃으며 받아치거나 억울해하는 정도.",
-  ask:
-    "질문: 상대가 왜 그렇게 느끼는지, 무엇이 제일 서운했는지처럼 상대의 마음이나 이유를 딱 하나 묻는다. 해결책을 묻지 않는다('어떻게 하면 좋을까', '같이 정해볼래' 금지). 마지막 문장은 질문이다.",
+  ask: "질문: 상대가 왜 그렇게 느끼는지, 무엇이 제일 서운했는지처럼 상대의 마음이나 이유를 딱 하나 묻는다. 해결책을 묻지 않는다('어떻게 하면 좋을까', '같이 정해볼래' 금지). 마지막 문장은 질문이다.",
   concede:
-    "조건부 수긍: 머쓱하게, 짧게 받아들인다(\"…그건 그렇네\", \"알았어 알았어\"). 그리고 네 걱정이나 조건 하나를 투박하게 붙인다. 질문으로 끝내지 않는다.",
+    '조건부 수긍: 머쓱하게, 짧게 받아들인다("…그건 그렇네", "알았어 알았어"). 그리고 네 걱정이나 조건 하나를 투박하게 붙인다. 질문으로 끝내지 않는다.',
   linger:
     "여운: 마지막 마디의 미결 결론이다. 아직 합의하지 못했지만 감정이나 생각이 남아 있어 당장 더 말하지 않는 상태다. 지금 네 감정과 관계 상태에 맞는 여운을 남긴다. 대사와 행동 묘사 중 무엇을 쓸지, 어떤 순서로 쓸지는 네가 정한다. 대사는 1문장 이하로 하고 질문하지 않는다. 사과나 부분 인정만으로 합의·약속처럼 끝내지 않는다. 속마음에 남은 서운함·경계가 이번 결론에 영향을 준다면 반응에도 드러난다.",
 };
@@ -291,21 +316,28 @@ export function scenarioFor(partner: Partner) {
     partnerLabel: PARTNERS[partner].label,
     place: SCENARIO.place,
     kakao: SCENARIO.kakao,
-    opening: SCENARIO.opening.map((b) => ({ ...b, content: forPartner(b.content, partner) })),
+    opening: SCENARIO.opening.map((b) => ({
+      ...b,
+      content: forPartner(b.content, partner),
+    })),
   };
 }
 
-export const sceneFactsFor = (partner: Partner) => SCENE_FACTS.map((f) => forPartner(f, partner));
+export const sceneFactsFor = (partner: Partner) =>
+  SCENE_FACTS.map((f) => forPartner(f, partner));
 
 export function coreFor(partner: Partner): string {
   const p = PARTNERS[partner];
-  return (partner === "m" ? YUNJAE_CORE : forPartner(SEOA_CORE_TEMPLATE, partner)).replace(
+  return (
+    partner === "m" ? YUNJAE_CORE : forPartner(SEOA_CORE_TEMPLATE, partner)
+  ).replace(
     `# 인물 Core: ${p.name}\n`,
-    `# 인물 Core: ${p.name}\n\n## 기본\n- 20대 후반 ${p.gender} 회사원이다. 플레이어와 1년 넘게 사귄 연인이다.\n`,
+    `# 인물 Core: ${p.name}\n\n## 기본\n- 20대 후반 ${p.gender} 회사원이다. 플레이어와 1년 넘게 사귄 연인이다.\n`
   );
 }
 
-export const rubricFor = (partner: Partner) => forPartner(SCORING_RUBRIC, partner);
+export const rubricFor = (partner: Partner) =>
+  forPartner(SCORING_RUBRIC, partner);
 
 /**
  * 가치 실험(docs/character-intent.md §6) 전용: Core의 "중요하게 생각하는 것" 절 끝(지금 상태 절 바로 앞)에 단락 하나를 더한다.
