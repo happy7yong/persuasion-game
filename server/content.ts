@@ -294,6 +294,23 @@ JSON 객체 하나만 쓴다. 적힌 순서대로 쓴다: 먼저 듣고 판단�
 - beats: 1~4개. 기본은 dialogue 1~2개 또는 dialogue 1개와 narration 1개다. 3개 이상은 각 beat가 직전 플레이어 말에 대한 서로 다른 새 반응일 때만 쓴다. dialogue는 너의 대사(따옴표 없이), narration은 플레이어가 볼 수 있는 너의 짧은 행동 묘사(속마음 금지). 각 content 200자 이내. 받아칠지, 물을지, 받아들일지, 말을 아낄지는 heard·want에서 나온 네 판단대로 정한다. heard·want를 대사로 설명하지 않는다.
 - refs: 이번 대사가 아래 기록의 항목을 다뤘다면 그 id와 용도를 적는다. assert(그 주장을 다시 내세움) · acknowledge(상대가 받아들인다고 말한 것을 인정하거나 고마워함) · reference(지나가듯 언급). 다루지 않았으면 [].`;
 
+/**
+ * 경험 실험(docs/appraisal-review.md §16)의 출력 형식. B의 형식에 판단 필드 셋(focus·belief·standard)만 더한다.
+ * 나머지 줄은 B와 글자까지 같게 B에서 만든다. 필드 설명에는 특정 판단 축(진심·구체성 등)의 예를 들지 않는다 (유도하지 않게).
+ */
+export const EXPERIENCE_OUTPUT_FORMAT = APPRAISAL_OUTPUT_FORMAT.replace(
+  '{"heard":"...","shift":',
+  '{"heard":"...","focus":"...","belief":"...","standard":["...","..."],"shift":',
+).replace(
+  /^(- heard: .*)$/m,
+  [
+    "$1",
+    "- focus: 방금 말에서 네가 가장 크게 본 것 한 줄(40자 이내). 그 말의 어느 부분, 또는 어떤 면이었는지.",
+    "- belief: 지금 플레이어에 대해 네가 생각하는 것 한 줄(60자 이내).",
+    "- standard: 이런 말을 들었을 때 지금 너는 무엇을 보고 판단하는지, 중요한 순서대로 1~3개(각 30자 이내). 이번 말에 대한 감상이 아니라 판단의 기준을 적는다.",
+  ].join("\n"),
+);
+
 /** B의 우선순위. DIALOGUE_PRIORITIES에서 2번(장부 상태의 의미)만 바꾼다. 1·3·4번은 같다. */
 export const APPRAISAL_PRIORITIES = `# 무엇을 먼저 따르나
 1. 장면 사실: 지금 너와 플레이어는 카페에 마주 앉아 있다. 오늘 네 일은 이미 끝났다. 시간·장소·누가 어디 있는지는 대화 중에 바뀌지 않는다.

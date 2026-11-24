@@ -18,6 +18,9 @@
 //   npm run eval -- value [--runs 2] [--model 모델] [--only base|value]  # 가치 실험 (docs/character-intent.md §6). 윤재 첫 마디, 발화 4개를
 //                                         # 기존 Core / Core + 가치 단락으로. 대사 모델은 배포 모델(PRODUCTION_DIALOGUE_MODEL), 1차는 발화마다 1회(두 조건 공통).
 //                                         # 결과: 가린 비교표 + 정답 키(value-key.json) + 검토표
+//   npm run eval -- experience [--runs 5] # 경험 실험 (docs/appraisal-review.md §16). 윤재만. 같은 발화를 이전 경험만 다른
+//                                         # 세 조건(A 약속 어김 · B 약속 지킴 · C 정보 없음)으로. 실험 1 B 프롬프트 + 경험 블록 + 판단 필드.
+//                                         # 결과: 가린 비교표 + 정답 키(experience-key.json) + 해석 검토표
 //   --label 이름                         # 결과 폴더 이름에 붙임
 //
 // 비용 보호 (scripts/eval/budget.ts)
@@ -48,6 +51,7 @@ const { ledgerLines, applyFacts } = await import("../server/ledger.js");
 const C = await import("./eval/cases.js");
 const AP = await import("./eval/appraisal.js");
 const VL = await import("./eval/value.js");
+const EXP = await import("./eval/experience.js");
 const M = await import("./eval/metrics.js");
 const B = await import("./eval/budget.js");
 const RJ = await import("./eval/rejudge.js");
@@ -68,7 +72,7 @@ const label = opt("label") ?? mode;
 const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const outDir = `eval-results/${stamp}-${label}`;
 
-const MODES = ["all", "replay", "cross", "mind", "ledger", "scene", "offline", "v3compare", "rejudge", "appraisal", "value"];
+const MODES = ["all", "replay", "cross", "mind", "ledger", "scene", "offline", "v3compare", "rejudge", "appraisal", "value", "experience"];
 if (!MODES.includes(mode)) {
   console.log(`모르는 모드: ${mode} (${MODES.join(", ")})`);
   process.exit(1);
@@ -672,6 +676,87 @@ async function runValue(runs: number) {
   json.value = { seed, addition: C.VALUE_ADDITION, lines: C.VALUE_LINES, cells };
 }
 
+// ------------------------------------------------------------------ 경험 실험: 이전 경험이 다음 평가를 바꾸는가 (docs/appraisal-review.md §16)
+
+async function runExperience(runs: number) {
+  const conds = ["A", "B", "C"] as const;
+  console.log(`· experience: 윤재 · 발화 ${C.EXPERIENCE_LINES.length}개 × 조건 3 × ${runs}회`);
+  const seed = parseInt(createHash("sha256").update(stamp).digest("hex").slice(0, 8), 16);
+  const cells: import("./eval/experience.js").ExpCell[] = [];
+  type ExpGen = import("./eval/experience.js").ExpGen;
+  for (const item of C.EXPERIENCE_LINES) {
+    if (budget.stopped) break;
+    // 실험 1과 같은 앞 대화 1마디, 같은 시작 마음(기본값). 윤재만
+    const s = recordTurn(newGame(`eval-experience-${item.key}`, Date.now(), false, "m"), {
+      player: C.APPRAISAL_PREFIX.player,
+      npc: [{ type: "dialogue", content: C.APPRAISAL_PREFIX.npc }],
+      move: "counter",
+      suggested: 0,
+      labels: [],
+    });
+    const cell: (typeof cells)[number] = { key: item.key, line: item.line, about: item.about, gens: [] };
+    cells.push(cell);
+    // 1차는 발화마다 한 번: 세 조건과 모든 반복이 같은 객관 기록을 쓴다 (1차는 경험을 보지 않는다)
+    if (!budget.allow(EST.turn_frame)) {
+      cell.factsFailure = `budget: ${budget.stopped}`;
+      continue;
+    }
+    const fr = await callWithRetry(modelConfig("turn_frame"), { ...buildFactsPrompt(s, item.line), schemaName: "turn_facts", schema: FACTS_JSON_SCHEMA }, (j, a) => parseFacts(s, item.line, j, !a.last));
+    account("turn_frame", fr.attempts);
+    if (!fr.ok) {
+      cell.factsFailure = fr.failure.message;
+      continue;
+    }
+    const facts = fr.value;
+    const who = (b: string) => (b === "player" ? "플레이어" : "연인");
+    cell.factsSummary = [
+      `정리: ${facts.resolved.map((r) => `${r.id} ${who(r.by)} ${r.status} “${r.quote}”`).join(", ") || "없음"}`,
+      `새 항목: ${facts.added.map((a) => `${a.id} ${who(a.by)} ${a.kind} “${a.quote}”`).join(", ") || "없음"}`,
+      ...(facts.dropped?.length ? [`버린 것 ${facts.dropped.length}`] : []),
+    ].join(" · ");
+    const jobs = conds.flatMap((cond) => Array.from({ length: runs }, (_, i) => ({ cond, run: i + 1 })));
+    cell.gens = await pool(jobs, 4, async (job): Promise<ExpGen> => {
+      const fail = (failure: string, drafts: ExpGen["drafts"] = []): ExpGen => ({ cond: job.cond, run: job.run, ok: false, failure, drafts });
+      if (!budget.allow(APPRAISAL_GEN.max)) return fail(`budget: ${budget.stopped}`);
+      const memory = C.EXPERIENCES[job.cond].memory;
+      const r = await appraisalReplyFromFacts(s, item.line, facts, { judgement: true, ...(memory ? { memory } : {}) });
+      account("npc_turn", r.attempts);
+      account("scene_check", r.sceneAttempts);
+      if (!r.ok) return fail(r.failure.message, AP.draftsFrom(r.attempts, []));
+      const x = r.reply;
+      return { cond: job.cond, run: job.run, ok: true, drafts: AP.draftsFrom(r.attempts, x.checks), final: x.beats, outcome: x.outcome, endsWithQuestion: x.endsWithQuestion, heard: x.heard, focus: x.focus, belief: x.belief, standard: x.standard, shift: x.shift, want: x.want };
+    });
+    cell.gens.sort((a, b) => (a.cond === b.cond ? a.run - b.run : a.cond < b.cond ? -1 : 1));
+    console.log(`  ${item.key}: ${cell.gens.filter((g) => g.ok).length}/${jobs.length}`);
+  }
+
+  const memories = Object.fromEntries(conds.map((k) => [k, C.EXPERIENCES[k].memory])) as Record<(typeof conds)[number], string | null>;
+  // 앞 대화: 장면 오프닝 + 앞 대화 1마디 (모든 조건에 같다)
+  const conversation = [
+    ...scenarioFor("m").opening.map((b) => (b.type === "narration" ? `*${b.content}*` : `> **윤재:** ${b.content}`)),
+    `> **플레이어:** ${C.APPRAISAL_PREFIX.player}`,
+    `> **윤재:** ${C.APPRAISAL_PREFIX.npc}`,
+  ].flatMap((l) => [l, ""]);
+  const blind = EXP.blindSheet(cells, seed, { conversation, model: MODELS.npc_turn, runs });
+  writeFileSync(`${outDir}/transcripts/experience-blind.md`, blind.md);
+  writeFileSync(`${outDir}/experience-key.json`, JSON.stringify({ seed, key: blind.key }, null, 2));
+  // 조건별 집계는 가린 비교 전에 보이지 않게 검토표에만 넣는다 (summary.md에는 넣지 않는다)
+  writeFileSync(`${outDir}/transcripts/experience-review.md`, [EXP.reviewSheet(cells, memories), "## 조건별 집계 (거친 표시)", "", ...EXP.summaryLines(cells)].join("\n"));
+  md.push(
+    "## 경험 실험: 이전 경험이 다음 평가를 바꾸는가",
+    "",
+    "- **같게 둔 것:** 윤재 Core · 장면 · 앞 대화 1마디 · 듣기 전 마음(기본값) · 마지막 플레이어 발화 · 1차 결과(발화마다 1회, 세 조건 공통) · 모델 · 검증기 V1~V3",
+    "- **다르게 둔 것:** 프롬프트의 `# 전에 있었던 일 (네 기억)` 블록 하나 (A 약속 어김 · B 약속 지킴 · C 블록 없음)",
+    "- **프롬프트:** 실험 1 B(직접 해석) + 판단 필드 focus·belief·standard. 서비스 생성 로직은 바꾸지 않았다",
+    "- **탐색 실험이다.** 과거 경험이 현재 사건의 해석과 실제 반응에 영향을 주는지 본다. 경험을 프롬프트에 넣어 준 것이므로, 실제 대화 중에 평가 기준을 갱신하는 기능을 증명하지 않는다",
+    "- **한계:** 한 번의 호출 안에서 경험을 읽고 판단한다. C는 블록 자체가 없어 프롬프트 길이·주제 노출도 함께 다르다. 표본이 작다",
+    `- 사람 검토: \`transcripts/experience-blind.md\`(가린 비교, 먼저) → \`experience-key.json\` → \`transcripts/experience-review.md\`(조건별 속마음·집계) · 섞기 시드 ${seed}`,
+    `- 생성 성공 ${cells.flatMap((c) => c.gens).filter((g) => g.ok).length}/${cells.flatMap((c) => c.gens).length} (조건별 결과는 가린 비교 뒤에 검토표에서 본다)`,
+    "",
+  );
+  json.experience = { seed, prefix: C.APPRAISAL_PREFIX, experiences: C.EXPERIENCES, lines: C.EXPERIENCE_LINES, cells };
+}
+
 // ------------------------------------------------------------------ V3 장면 판정
 
 async function runScene(runs: number) {
@@ -888,6 +973,7 @@ const R = {
   rejudgeRuns: runsOpt ?? 3,
   appraisalRuns: runsOpt ?? 3,
   valueRuns: runsOpt ?? 2,
+  experienceRuns: runsOpt ?? 5,
 };
 if (mode === "replay") {
   const play = opt("play");
@@ -927,6 +1013,10 @@ if (mode === "value") {
   B.addToPlan(plan, "가치 실험 1차 (두 조건 공통)", C.VALUE_LINES.length, one("turn_frame"));
   B.addToPlan(plan, `가치 실험 대사 (윤재 × 조건 ${VALUE_CONDS.join("·")}, 배포 모델)`, C.VALUE_LINES.length * VALUE_CONDS.length * R.valueRuns, APPRAISAL_GEN);
 }
+if (mode === "experience") {
+  B.addToPlan(plan, "경험 실험 1차 (세 조건 공통)", C.EXPERIENCE_LINES.length, one("turn_frame"));
+  B.addToPlan(plan, "경험 실험 대사 (윤재 × A·B·C)", C.EXPERIENCE_LINES.length * 3 * R.experienceRuns, APPRAISAL_GEN);
+}
 if (mode === "appraisal") {
   B.addToPlan(plan, "실험 1 1차 (A·B 공통)", C.APPRAISAL_LINES.length * 2, one("turn_frame"));
   B.addToPlan(plan, "실험 1 대사 (A·B × 윤재·서아)", C.APPRAISAL_LINES.length * 2 * 2 * R.appraisalRuns, APPRAISAL_GEN);
@@ -961,6 +1051,7 @@ try {
   if (rejudgeData) await runRejudge(rejudgeDirs, R.rejudgeRuns, rejudgeData);
   if (mode === "appraisal") await runAppraisal(R.appraisalRuns);
   if (mode === "value") await runValue(R.valueRuns);
+  if (mode === "experience") await runExperience(R.experienceRuns);
   if (mode === "v3compare") {
     const [a, b] = argv.slice(1, 3);
     if (!a || !b) throw new Error("사용법: npm run eval -- v3compare <결과폴더A> <결과폴더B>");

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APPRAISAL_OUTPUT_FORMAT, APPRAISAL_PRIORITIES, BAND_GUIDE, COMMON_PRINCIPLES, coreFor, DIALOGUE_PRIORITIES, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, PARTNERS, rubricFor, SCENARIO, sceneFactsFor, scenarioFor, withCoreAddition } from "./content.js";
+import { APPRAISAL_OUTPUT_FORMAT, APPRAISAL_PRIORITIES, BAND_GUIDE, COMMON_PRINCIPLES, coreFor, DIALOGUE_PRIORITIES, ENGINE_RULES, EXPERIENCE_OUTPUT_FORMAT, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, PARTNERS, rubricFor, SCENARIO, sceneFactsFor, scenarioFor, withCoreAddition } from "./content.js";
 import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
 import { modelConfig } from "./model-config.js";
 import { buildSceneCheckPrompt, checkOutcome, parseSceneVerdict, reassertViolation, REF_USES, SCENE_JSON_SCHEMA, sceneTriggers, type AttemptCheck, type CheckOutcome, type Ref } from "./checks.js";
@@ -479,13 +479,52 @@ export function parseAppraisalOutput(raw: unknown): AppraisalOutput {
   return { ...out, beats: out.beats.map((b) => ({ type: b.type, content: b.content.replace(/^["“]|["”]$/g, "") })) };
 }
 
+// ------------------------------------------------------------------ 경험 실험 (docs/appraisal-review.md §16)
+// 실험 1 B 프롬프트에 "이전 경험" 블록과 판단 필드(focus·belief·standard)만 더한다. 평가에서만 쓴다.
+// variant를 주지 않으면 실험 1 B와 글자까지 같다.
+
+export interface AppraisalVariant {
+  /** 캐릭터의 이전 경험. 일어난 일만 쓰고 교훈·감정은 쓰지 않는다. 없으면 블록 자체를 넣지 않는다 */
+  memory?: string;
+  /** focus·belief·standard를 함께 받는다 (EXPERIENCE_OUTPUT_FORMAT) */
+  judgement?: boolean;
+}
+
+export const JudgedAppraisalOutputSchema = AppraisalOutputSchema.extend({
+  focus: z.string().trim().min(1).max(100),
+  belief: z.string().trim().min(1).max(140),
+  standard: z.array(z.string().trim().min(1).max(80)).min(1).max(3),
+});
+export type Judgement = Pick<z.infer<typeof JudgedAppraisalOutputSchema>, "focus" | "belief" | "standard">;
+
+/** 순서: heard → focus → belief → standard → shift → want → beats → refs */
+export const JUDGED_APPRAISAL_JSON_SCHEMA = {
+  ...APPRAISAL_JSON_SCHEMA,
+  required: ["heard", "focus", "belief", "standard", "shift", "want", "beats", "refs"],
+  properties: {
+    heard: APPRAISAL_JSON_SCHEMA.properties.heard,
+    focus: { type: "string" },
+    belief: { type: "string" },
+    standard: { type: "array", items: { type: "string" } },
+    shift: APPRAISAL_JSON_SCHEMA.properties.shift,
+    want: APPRAISAL_JSON_SCHEMA.properties.want,
+    beats: APPRAISAL_JSON_SCHEMA.properties.beats,
+    refs: APPRAISAL_JSON_SCHEMA.properties.refs,
+  },
+} as const;
+
+export function parseJudgedAppraisalOutput(raw: unknown): AppraisalOutput & Judgement {
+  const out = JudgedAppraisalOutputSchema.parse(raw);
+  return { ...out, beats: out.beats.map((b) => ({ type: b.type, content: b.content.replace(/^["“]|["”]$/g, "") })) };
+}
+
 /**
  * B의 프롬프트. A(buildNpcPrompt)와 다른 점:
  * - 없음: BAND 마음 묘사, 1차의 의미 라벨(factsLines), 장부 상태어, 끝맺음(move) 지정
  * - 바뀜: 장부 → "실제로 말해진 것"(spokenLines), 마음 → "듣기 전 마음", 우선순위 2번, 출력 형식(heard → shift → want → beats)
  * - 같음: 규칙·공통 원칙·Core·장면·반복 금지, 대화 기록과 방금 말(user)
  */
-export function buildAppraisalPrompt(state: GameState, playerText: string, facts: TurnFacts): { system: string; user: string } {
+export function buildAppraisalPrompt(state: GameState, playerText: string, facts: TurnFacts, variant: AppraisalVariant = {}): { system: string; user: string } {
   const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
   const partner = state.partner ?? "m";
   const system = [
@@ -493,10 +532,11 @@ export function buildAppraisalPrompt(state: GameState, playerText: string, facts
     COMMON_PRINCIPLES,
     coreFor(partner),
     `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
-    APPRAISAL_OUTPUT_FORMAT,
+    variant.judgement ? EXPERIENCE_OUTPUT_FORMAT : APPRAISAL_OUTPUT_FORMAT,
     APPRAISAL_PRIORITIES,
     REPEAT_RULES,
-    // ---- 여기부터 매 마디 바뀐다
+    // ---- 여기부터 매 마디 바뀐다 (경험 블록은 조건마다 다르므로 이 아래에 둔다: 앞부분 캐시를 조건끼리 나눠 쓴다)
+    ...(variant.memory ? [`# 전에 있었던 일 (네 기억)\n${variant.memory}`] : []),
     `# 듣기 전 네 마음\n${mindLine(state)}\n방금 플레이어의 말을 듣기 전의 마음이다. 그 말을 어떻게 받아들일지는 Core의 성향과 이 마음으로 네가 판단한다.`,
     `# 지금까지 실제로 말해진 것 (누가 무엇을 말했나)\n${spokenLines(ledgerAfter)}`,
   ].join("\n\n");
@@ -521,18 +561,23 @@ export interface AppraisalReply {
   endsWithQuestion: boolean;
   checks: AttemptCheck[];
   outcome: CheckOutcome;
+  /** variant.judgement일 때만 */
+  focus?: string;
+  belief?: string;
+  standard?: string[];
 }
 export type AppraisalResult = ({ ok: true; reply: AppraisalReply } | { ok: false; failure: LlmFailure }) & { attempts: AttemptRecord[]; sceneAttempts: AttemptRecord[] };
 
 /** 조건 B로 대사를 만든다. 검증기·재시도 정책은 A와 같다 (V4는 끝맺음을 정하지 않아 해당 없음). 상태는 바꾸지 않는다. */
-export async function appraisalReplyFromFacts(state: GameState, playerText: string, facts: TurnFacts): Promise<AppraisalResult> {
+export async function appraisalReplyFromFacts(state: GameState, playerText: string, facts: TurnFacts, variant: AppraisalVariant = {}): Promise<AppraisalResult> {
   const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
-  const prompt = buildAppraisalPrompt(state, playerText, facts);
+  const prompt = buildAppraisalPrompt(state, playerText, facts, variant);
+  const schema = variant.judgement ? JUDGED_APPRAISAL_JSON_SCHEMA : APPRAISAL_JSON_SCHEMA;
   const checks: AttemptCheck[] = [];
   const sceneAttempts: AttemptRecord[] = [];
   const ctx = { state, playerText, ledgerAfter, sceneAttempts };
   const parse = async (json: unknown, a: { index: number; last: boolean }) => {
-    const out = parseAppraisalOutput(json);
+    const out: AppraisalOutput & Partial<Judgement> = variant.judgement ? parseJudgedAppraisalOutput(json) : parseAppraisalOutput(json);
     const check = await checkAttempt(ctx, { beats: out.beats, refs: out.refs, move: null }, a);
     checks.push(check);
     if (check.violations.length && !a.last) throw new Error(check.violations.join(" | "));
@@ -540,7 +585,7 @@ export async function appraisalReplyFromFacts(state: GameState, playerText: stri
   };
   const res = await callWithRetry(
     modelConfig("npc_turn"),
-    ({ lastError }) => ({ ...prompt, user: prompt.user + (lastError ? retryNote(lastError) : ""), schemaName: "npc_appraisal", schema: APPRAISAL_JSON_SCHEMA }),
+    ({ lastError }) => ({ ...prompt, user: prompt.user + (lastError ? retryNote(lastError) : ""), schemaName: "npc_appraisal", schema }),
     parse,
   );
   if (!res.ok) return { ok: false, failure: res.failure, attempts: res.attempts, sceneAttempts };
