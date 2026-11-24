@@ -297,6 +297,22 @@ function Intro({
             successShake={shared.successShake}
           />
         )}
+        <ol className="intro-message-timeline" aria-label="오늘 주고받은 메시지">
+          <li className="intro-message me">
+            <span className="intro-message-unread first" aria-hidden="true">1</span>
+            <time>10:36</time>
+            <span className="intro-message-bubble">오늘 진짜 힘들다...</span>
+          </li>
+          <li className="intro-message me">
+            <span className="intro-message-unread second" aria-hidden="true">1</span>
+            <time>16:25</time>
+            <span className="intro-message-bubble">뭐해?</span>
+          </li>
+          <li className="intro-message npc">
+            <span className="intro-message-bubble">미안</span>
+            <time>18:23</time>
+          </li>
+        </ol>
         <p className="intro-scene intro-reveal intro-reveal-scene">
           <svg
             className="intro-scene-letter"
@@ -324,22 +340,6 @@ function Intro({
             )
           )}
         </h1>
-        <ol className="intro-message-timeline" aria-label="오늘 주고받은 메시지">
-          <li className="intro-message me">
-            <span className="intro-message-unread first" aria-hidden="true">1</span>
-            <time>10:36</time>
-            <span className="intro-message-bubble">오늘 진짜 힘들다...</span>
-          </li>
-          <li className="intro-message me">
-            <span className="intro-message-unread second" aria-hidden="true">1</span>
-            <time>16:25</time>
-            <span className="intro-message-bubble">뭐해?</span>
-          </li>
-          <li className="intro-message npc">
-            <span className="intro-message-bubble">미안</span>
-            <time>18:23</time>
-          </li>
-        </ol>
         <p className="intro-lede intro-reveal intro-reveal-lede">
           오늘 팀장님한테 깨져서 기댈 곳이 필요했는데, 연인은 하루 종일 답이 없었어요.
           <br />

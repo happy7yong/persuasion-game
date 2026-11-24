@@ -64,8 +64,8 @@ export const isTurnFacts = (x: unknown): x is TurnFacts => typeof x === "object"
 export function initialLedger(): LedgerItem[] {
   return [
     { id: "L1", by: "npc", kind: "limit", issue: "availability", text: "오늘은 회의가 이어져 답장이 늦었다", quote: "회의 연달아 있었어", turn: 0, status: "open" },
-    { id: "L2", by: "npc", kind: "concern", issue: "intent-trust", text: "'나 무시해?'라는 말이 서운하다", quote: "'나 무시해?'는 좀… 그 말은 서운했어", turn: 0, status: "open" },
-    { id: "L3", by: "player", kind: "concern", issue: "read-gap", text: "읽고도 몇 시간 답이 없어 불안하고 서운했다", quote: "나 무시해?", turn: 0, status: "open" },
+    { id: "L2", by: "npc", kind: "concern", issue: "intent-trust", text: "마지막 카톡이 이어진 것이 당황스럽다", quote: "아까 카톡은 나도 좀 당황했어", turn: 0, status: "open" },
+    { id: "L3", by: "player", kind: "concern", issue: "read-gap", text: "읽고도 몇 시간 답이 없어 불안하고 서운했다", quote: "뭐해?", turn: 0, status: "open" },
   ];
 }
 

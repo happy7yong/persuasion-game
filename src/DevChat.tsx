@@ -29,7 +29,7 @@ const initialMessages = (name: string): PreviewMessage[] => [
   {
     id: 4,
     who: "npc",
-    text: "근데 '나 무시해?'는 좀… 그 말은 서운했어.",
+    text: "근데 아까 카톡은 나도 좀 당황했어.",
   },
   {
     id: 5,
@@ -164,7 +164,7 @@ export function DevChat() {
         npcName={chosen.name}
         kakao={[
           { time: "15:10", from: "me", text: "바빠?", readAt: "15:32" },
-          { time: "17:35", from: "me", text: "나 무시해?" },
+          { time: "17:35", from: "me", text: "뭐해?" },
           {
             time: "18:52",
             from: "npc",

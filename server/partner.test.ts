@@ -25,6 +25,7 @@ describe("연인 선택", () => {
     expect(p.system).toContain("# 인물 Core: 서아");
     expect(p.system).toContain("20대 후반 여자 회사원");
     expect(p.user).toContain("- 너 (말): 아까 답 늦은 건 미안해.");
+    expect(p.user).toContain("- 너 (말): 근데 아까 카톡은 나도 좀 당황했어.");
   });
 
   it("서아는 투박해도 문장이 어긋나거나 이미 말한 사정을 반복하지 않는다", () => {
@@ -67,7 +68,7 @@ describe("연인 선택", () => {
     expect(coreFor("m")).toContain("사과는 일부러 무시했다는 해석이나 앞으로 항상 연락하겠다는 약속에 동의하는 뜻이 아니다");
     expect(coreFor("m")).not.toContain("명사를 분명히");
     expect(coreFor("m")).toContain("플레이어가 팀장에게 혼난 일은 진심으로 걱정하고 있다");
-    expect(coreFor("m")).toContain("억울하고 서운하다");
+    expect(coreFor("m")).toContain("마지막 카톡이 이어진 건 조금 당황스럽다");
     expect(coreFor("m")).toContain("윤재가 원하는 것과 화가 나는 조건");
     expect(coreFor("m")).toContain("설명을 전부 변명으로만 치부하면 윤재도 화가 난다");
     expect(coreFor("m")).toContain("플레이어 말을 \"그 정도면\", \"알아듣겠어\"");
