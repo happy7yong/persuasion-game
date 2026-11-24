@@ -1,18 +1,30 @@
 // 연인별 Core와 공통 장면을 검증한다.
 import { describe, expect, it } from "vitest";
-import { coreFor, PARTNERS, rubricFor, scenarioFor, sceneFactsFor } from "./content.js";
+import { coreFor, PARTNERS, rubricFor, scenarioFor, sceneFactsFor, SCENARIO } from "./content.js";
+import { initialLedger } from "./ledger.js";
 import { buildReport } from "./report.js";
 import { buildNpcPrompt, scriptedReply } from "./npc.js";
 import { newGame, recordTurn } from "./rules.js";
 
 describe("연인 선택", () => {
+  it("장면 시작 장부의 인용은 실제 카톡 또는 오프닝에 있다", () => {
+    const npcWords = [
+      ...SCENARIO.kakao.filter((message) => message.from === "npc").map((message) => message.text),
+      ...SCENARIO.opening.filter((beat) => beat.type === "dialogue").map((beat) => beat.content),
+    ].join("\n");
+    const playerWords = SCENARIO.kakao.filter((message) => message.from === "me").map((message) => message.text).join("\n");
+    for (const item of initialLedger()) {
+      expect(item.by === "npc" ? npcWords : playerWords).toContain(item.quote);
+    }
+  });
+
   it("여자친구 서아의 프롬프트에는 윤재가 남지 않는다", () => {
     const s = newGame("f1", Date.now(), false, "f");
     const p = buildNpcPrompt(s, "안녕", "counter");
     expect(p.system + p.user).not.toContain("윤재");
     expect(p.system).toContain("# 인물 Core: 서아");
     expect(p.system).toContain("20대 후반 여자 회사원");
-    expect(p.user).toContain("- 너 (말): 팀장님 얘기는");
+    expect(p.user).toContain("- 너 (말): 아까 답 늦은 건 미안해.");
   });
 
   it("서아는 투박해도 문장이 어긋나거나 이미 말한 사정을 반복하지 않는다", () => {

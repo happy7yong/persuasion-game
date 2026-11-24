@@ -63,8 +63,8 @@ export const isTurnFacts = (x: unknown): x is TurnFacts => typeof x === "object"
 /** 장면 시작 때 이미 말해진 것 (오프닝 대사와 카톡). */
 export function initialLedger(): LedgerItem[] {
   return [
-    { id: "L1", by: "npc", kind: "limit", issue: "availability", text: "일할 때는 연락에 바로 답하기 어렵다", quote: "일할 땐 오늘처럼 답 늦을 때도 있어", turn: 0, status: "open" },
-    { id: "L2", by: "npc", kind: "concern", issue: "intent-trust", text: "'나 무시해?'라는 말이 서운하다. 일부러 피한 게 아니다", quote: "'나 무시해?'는 좀…", turn: 0, status: "open" },
+    { id: "L1", by: "npc", kind: "limit", issue: "availability", text: "오늘은 회의가 이어져 답장이 늦었다", quote: "회의 연달아 있었어", turn: 0, status: "open" },
+    { id: "L2", by: "npc", kind: "concern", issue: "intent-trust", text: "'나 무시해?'라는 말이 서운하다", quote: "'나 무시해?'는 좀… 그 말은 서운했어", turn: 0, status: "open" },
     { id: "L3", by: "player", kind: "concern", issue: "read-gap", text: "읽고도 몇 시간 답이 없어 불안하고 서운했다", quote: "나 무시해?", turn: 0, status: "open" },
   ];
 }
