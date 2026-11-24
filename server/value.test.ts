@@ -25,10 +25,10 @@ describe("Core 변형", () => {
 
   it("서아 Core에도 같은 자리에 들어간다", () => {
     const core = withCoreAddition(coreFor("f"), ADD);
-    expect(core.indexOf(ADD)).toBeLessThan(core.indexOf("## 지금 서아의 상태"));
+    expect(core.indexOf(ADD)).toBeLessThan(core.indexOf("## 지금 상태"));
   });
 
-  it("consolidate@2: 윤재 Core에는 가치 단락이 들어 있고 서아 Core에는 없다", () => {
+  it("consolidate@2: 윤재의 가치 문단은 서아에게 복사되지 않는다", () => {
     const value = "윤재는 서로의 상황과 감정을 존중하는 관계를 중요하게 여긴다.";
     const yunjae = coreFor("m");
     expect(yunjae).toContain(value);

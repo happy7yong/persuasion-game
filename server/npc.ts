@@ -305,7 +305,8 @@ function beatLine(b: { type: string; content: string }) {
 // 할 수 있는 만큼만 답하기, 하루 재연 금지, 최우선 체크 등)을 뺐다. 성격·가치 문장은 그대로. 서아·BAND·chooseMove·점수는 그대로 (docs/character-intent.md §7)
 // consolidate@4 (2026-11-24, score-review 브랜치): 대사 프롬프트는 같다. 마음 규칙(nextMind)에 "플레이어가 사과하면 미안함↑"을 더했다 (결과 비교에서 구분하려고 버전을 올린다)
 // consolidate@5 (2026-11-24, relationship-evidence 브랜치): 이번 발화를 반영한 마음·점수와 그 변화의 인용 근거를 대사 전에 보여 준다.
-export const NPC_PROMPT_VERSION = "consolidate@5";
+// consolidate@6 (2026-11-24, seoa-core-values 브랜치): 서아 Core를 성격·가치 중심으로 재구성하고 행동 순서·결말 시점 지시와 소품 행동 예시를 뺐다. 윤재 Core와 공통 규칙은 그대로다.
+export const NPC_PROMPT_VERSION = "consolidate@6";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
