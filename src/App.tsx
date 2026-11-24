@@ -346,6 +346,7 @@ function Intro({
           {stats && stats.best !== null ? (
             <>
               연인과 가장 잘 통한 기록은 <strong>{stats.best}%</strong>
+              <span className="intro-count-question">당신은 어디까지 마음을 움직일 수 있을까요?</span>
               {/* 참여자가 MIN_FOR_COUNT명 모이기 전에는 몇 명이 도전했는지 밝히지 않는다 */}
               {stats.finished >= MIN_FOR_COUNT && (
                 <span className="intro-count-sub">
