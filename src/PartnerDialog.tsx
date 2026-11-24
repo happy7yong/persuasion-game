@@ -40,7 +40,7 @@ export function PartnerDialog({
         <h2 id="partner-dialog-title" className="giveup-title">
           누구와 이야기할까요?
         </h2>
-        <p className="partner-dialog-desc">오늘의 이야기를 들려줄 연인을 골라 주세요.</p>
+        <p className="partner-dialog-desc">함께 이야기할 연인을 골라 주세요.</p>
         <div className="partner-dialog-options">
           {PARTNER_OPTIONS.map((option) => (
             <button
