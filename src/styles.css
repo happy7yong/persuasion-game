@@ -85,7 +85,7 @@ button:disabled {
   min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 24px 18px;
+  padding: 24px 24px;
 }
 .intro-card {
   width: 100%;
@@ -101,6 +101,14 @@ button:disabled {
   font-family: var(--hand);
   font-size: 26px;
   line-height: 1.05;
+}
+.intro-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: intro-reveal 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.intro-reveal-scene {
+  animation-delay: 20ms;
 }
 .intro-scene-letter {
   width: 19px;
@@ -146,7 +154,9 @@ button:disabled {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .intro-title-letter {
+  .intro-title-letter,
+  .intro-message,
+  .intro-reveal {
     opacity: 1;
     transform: none;
     animation: none;
@@ -155,6 +165,84 @@ button:disabled {
 .intro-lede {
   font-size: 17px;
   margin: 0 0 22px;
+}
+.intro-message-timeline {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: -4px 0 20px;
+  padding: 0;
+}
+.intro-message {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(18px);
+  animation: intro-message-rise 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.intro-message:nth-child(1) {
+  animation-delay: 1.4s;
+}
+.intro-message:nth-child(2) {
+  animation-delay: 2.15s;
+}
+.intro-message:nth-child(3) {
+  animation-delay: 2.9s;
+}
+.intro-message.me {
+  justify-content: end;
+}
+.intro-message-bubble {
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 17px;
+  line-height: 1.4;
+  background: var(--white);
+}
+.intro-message.me .intro-message-bubble {
+  border-bottom-right-radius: 4px;
+  color: var(--ink);
+}
+.intro-message.npc .intro-message-bubble {
+  border-bottom-left-radius: 4px;
+}
+.intro-message time {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.intro-message.npc {
+  margin-top: 15px;
+}
+@keyframes intro-message-rise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.intro-reveal-lede {
+  animation-delay: 3.68s;
+}
+.intro-reveal-count {
+  animation-delay: 3.82s;
+}
+.intro-reveal-rules {
+  animation-delay: 3.96s;
+}
+.intro-reveal-consent {
+  animation-delay: 4.1s;
+}
+.intro-reveal-start {
+  animation-delay: 4.24s;
+}
+@keyframes intro-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .partner {
   border: 0;
@@ -700,11 +788,11 @@ button:disabled {
   background: transparent;
   color: var(--ink);
 }
-/* 뒤 화면을 흑백으로: 갈색 기운 없는 중립 회색으로 어둡게 + 채도 0 */
+/* 모든 모달의 뒤 화면: 채도는 유지하고 중립 회색 오버레이만 얹는다. */
 .giveup-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.32);
-  -webkit-backdrop-filter: grayscale(1);
-  backdrop-filter: grayscale(1);
+  background: rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .giveup-dialog[open] .giveup-sheet {
   animation: sheet-up 0.22s ease-out both;
@@ -754,6 +842,38 @@ button:disabled {
 .giveup-stop {
   background: rgba(53, 22, 8, 0.07);
   color: var(--muted);
+}
+.partner-dialog-desc {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 15px;
+}
+.partner-dialog-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.partner-dialog-options button {
+  display: grid;
+  gap: 2px;
+  border: 0;
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(53, 22, 8, 0.07);
+  color: var(--ink);
+  text-align: left;
+}
+.partner-dialog-options span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.partner-dialog-options strong {
+  font-size: 21px;
+}
+.partner-dialog-options button.on {
+  background: #fff1e8;
+  transform: translateY(-1px);
 }
 @media (min-width: 600px) {
   .giveup-dialog {
