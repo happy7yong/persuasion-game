@@ -26,7 +26,7 @@ export const SCENARIO = {
     { time: "15:10", from: "me", text: "바빠?", readAt: "15:32" },
     { time: "15:52", from: "me", text: "??" },
     { time: "16:40", from: "me", text: "저녁에 볼 수 있는 거지?" },
-    { time: "17:35", from: "me", text: "아직 바빠?" },
+    { time: "17:35", from: "me", text: "뭐해?" },
     {
       time: "18:52",
       from: "npc",

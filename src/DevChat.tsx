@@ -164,7 +164,7 @@ export function DevChat() {
         npcName={chosen.name}
         kakao={[
           { time: "15:10", from: "me", text: "바빠?", readAt: "15:32" },
-          { time: "17:35", from: "me", text: "아직 바빠?" },
+          { time: "17:35", from: "me", text: "뭐해?" },
           {
             time: "18:52",
             from: "npc",
