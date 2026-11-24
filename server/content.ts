@@ -339,3 +339,13 @@ export function coreFor(partner: Partner): string {
 }
 
 export const rubricFor = (partner: Partner) => forPartner(SCORING_RUBRIC, partner);
+
+/**
+ * 가치 실험(docs/character-intent.md §6) 전용: Core의 "중요하게 생각하는 것" 절 끝(지금 상태 절 바로 앞)에 단락 하나를 더한다.
+ * 서비스는 쓰지 않는다. 넣을 자리를 못 찾으면 조용히 넘어가지 않고 멈춘다.
+ */
+export function withCoreAddition(core: string, addition: string): string {
+  const at = core.search(/\n\n## 지금 [^\n]*상태/);
+  if (at < 0) throw new Error("Core에서 '## 지금 … 상태' 절을 찾지 못했다");
+  return `${core.slice(0, at)}\n\n${addition.trim()}${core.slice(at)}`;
+}

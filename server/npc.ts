@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APPRAISAL_OUTPUT_FORMAT, APPRAISAL_PRIORITIES, BAND_GUIDE, COMMON_PRINCIPLES, coreFor, DIALOGUE_PRIORITIES, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, PARTNERS, rubricFor, SCENARIO, sceneFactsFor, scenarioFor } from "./content.js";
+import { APPRAISAL_OUTPUT_FORMAT, APPRAISAL_PRIORITIES, BAND_GUIDE, COMMON_PRINCIPLES, coreFor, DIALOGUE_PRIORITIES, ENGINE_RULES, forPartner, MOVE_GUIDE, OUTPUT_FORMAT, PARTNERS, rubricFor, SCENARIO, sceneFactsFor, scenarioFor, withCoreAddition } from "./content.js";
 import { callWithRetry, isScripted, type AttemptRecord, type LlmFailure, type LlmUsage } from "./llm.js";
 import { modelConfig } from "./model-config.js";
 import { buildSceneCheckPrompt, checkOutcome, parseSceneVerdict, reassertViolation, REF_USES, SCENE_JSON_SCHEMA, sceneTriggers, type AttemptCheck, type CheckOutcome, type Ref } from "./checks.js";
@@ -153,11 +153,18 @@ function sharedContentTerm(a: string, b: string): boolean {
 const REPEAT_RULES =
   "# 직전 응답과 반복 금지\n- 직전 네 대사에서 이미 설명한 사정·조건·결론을 같은 뜻의 다른 문장으로 다시 말하지 않는다. 특히 답장을 바로 하기 어렵다는 설명, 미리 한마디 하겠다는 약속처럼 이미 나온 핵심은 재진술 금지다.\n- 플레이어가 새 요구·이유 없이 짧게 수용하거나 확인했다면, 그 수용을 짧게 받거나 행동으로 반응하고 멈춘다. 같은 반론을 다시 증명하려 하지 않는다.\n- 이번 대사는 직전 응답에 없던 구체적인 반응·조건 조정·질문·행동 중 하나를 더할 때만 길게 쓴다. 새로 보탤 것이 없으면 짧게 끝낸다.";
 
+/** 평가 전용 Core 변형 (가치 실험). 주지 않으면 서비스와 같다 */
+export interface CoreVariant {
+  /** Core의 "중요하게 생각하는 것" 절 끝에 더할 단락 */
+  coreAddition?: string;
+}
+
 export function buildNpcPrompt(
   state: GameState,
   playerText: string,
   move: NpcMove | null = state.turns.length === 0 || isFinalTurn(state) ? null : chooseMove(state),
   facts?: TurnFacts,
+  variant: CoreVariant = {},
 ): { system: string; user: string } {
   const ledgerAfter = facts ? applyFacts(state.ledger, facts, state.turns.length + 1) : state.ledger;
   const partner = state.partner ?? "m";
@@ -167,7 +174,7 @@ export function buildNpcPrompt(
   const system = [
     ENGINE_RULES,
     COMMON_PRINCIPLES,
-    coreFor(partner),
+    variant.coreAddition ? withCoreAddition(coreFor(partner), variant.coreAddition) : coreFor(partner),
     `# 장면\n- 장소: ${SCENARIO.place}\n- 대화 방식: 직접 마주하고 있다\n## 네가 아는 사실\n${sceneFactsFor(partner).map((f) => `- ${f}`).join("\n")}`,
     OUTPUT_FORMAT,
     DIALOGUE_PRIORITIES,
@@ -384,12 +391,12 @@ async function checkAttempt(
  * 확정된 1차 결과로 대사를 만든다 (서비스 경로: npcReply가 1차 뒤에 부른다).
  * 평가는 같은 1차 결과를 여러 조건에 쓰려고 이 함수를 바로 부른다.
  */
-export async function replyFromFacts(state: GameState, playerText: string, facts: TurnFacts, factsAttempts: AttemptRecord[] = []): Promise<NpcResult> {
+export async function replyFromFacts(state: GameState, playerText: string, facts: TurnFacts, factsAttempts: AttemptRecord[] = [], variant: CoreVariant = {}): Promise<NpcResult> {
   const ledgerAfter = applyFacts(state.ledger, facts, state.turns.length + 1);
   const cfg = modelConfig("npc_turn");
   const finalTurn = isFinalTurn(state);
   const move = state.turns.length === 0 || finalTurn ? null : chooseMove(state);
-  const prompt = buildNpcPrompt(state, playerText, move, facts);
+  const prompt = buildNpcPrompt(state, playerText, move, facts, variant);
   const checks: AttemptCheck[] = [];
   const sceneAttempts: AttemptRecord[] = [];
   const ctx = { state, playerText, ledgerAfter, sceneAttempts };

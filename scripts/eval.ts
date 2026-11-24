@@ -15,6 +15,9 @@
 //   npm run eval -- appraisal [--runs 3]  # 실험 1: 캐릭터 직접 해석 (docs/appraisal-review.md §14). 같은 발화를 윤재·서아에게,
 //                                         # A 기존 엔진 · B 직접 해석(평가 전용 프롬프트)으로. 1차 결과는 A·B가 같이 쓴다.
 //                                         # 결과: 가린 비교표 + 정답 키(blind-key.json) + 해석 검토표
+//   npm run eval -- value [--runs 2] [--model 모델]  # 가치 실험 (docs/character-intent.md §6). 윤재 첫 마디, 발화 4개를
+//                                         # 기존 Core / Core + 가치 단락으로. 대사 모델은 배포 모델(Terra), 1차는 발화마다 1회(두 조건 공통).
+//                                         # 결과: 가린 비교표 + 정답 키(value-key.json) + 검토표
 //   --label 이름                         # 결과 폴더 이름에 붙임
 //
 // 비용 보호 (scripts/eval/budget.ts)
@@ -38,12 +41,13 @@ loadEnv();
 const { npcReply, buildFactsPrompt, parseFacts, FACTS_JSON_SCHEMA, replyRepetitionViolation, NPC_PROMPT_VERSION, replyFromFacts, appraisalReplyFromFacts, ENDS_WITH_QUESTION } = await import("../server/npc.js");
 const { newGame, recordTurn, shakePercent } = await import("../server/rules.js");
 const { callWithRetry, isScripted } = await import("../server/llm.js");
-const { modelConfig } = await import("../server/model-config.js");
+const { modelConfig, PRODUCTION_DIALOGUE_MODEL } = await import("../server/model-config.js");
 const { buildSceneCheckPrompt, parseSceneVerdict, SCENE_JSON_SCHEMA, SCENE_TRIGGERS, sceneTriggers } = await import("../server/checks.js");
-const { sceneFactsFor, PARTNERS } = await import("../server/content.js");
+const { sceneFactsFor, scenarioFor, SCENARIO, BAND_GUIDE, MOVE_GUIDE, PARTNERS } = await import("../server/content.js");
 const { ledgerLines, applyFacts } = await import("../server/ledger.js");
 const C = await import("./eval/cases.js");
 const AP = await import("./eval/appraisal.js");
+const VL = await import("./eval/value.js");
 const M = await import("./eval/metrics.js");
 const B = await import("./eval/budget.js");
 const RJ = await import("./eval/rejudge.js");
@@ -64,12 +68,14 @@ const label = opt("label") ?? mode;
 const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const outDir = `eval-results/${stamp}-${label}`;
 
-const MODES = ["all", "replay", "cross", "mind", "ledger", "scene", "offline", "v3compare", "rejudge", "appraisal"];
+const MODES = ["all", "replay", "cross", "mind", "ledger", "scene", "offline", "v3compare", "rejudge", "appraisal", "value"];
 if (!MODES.includes(mode)) {
   console.log(`모르는 모드: ${mode} (${MODES.join(", ")})`);
   process.exit(1);
 }
 const usesLlm = mode !== "offline" && mode !== "v3compare";
+// 가치 실험은 대사 모델만 배포 모델로 바꾼다 (1차·장면 판정은 그대로 Mini). 모델 설정을 읽기 전에 정한다
+if (mode === "value") process.env.NPC_DIALOGUE_MODEL = opt("model") ?? PRODUCTION_DIALOGUE_MODEL;
 if (isScripted() && usesLlm && !argv.includes("--plan")) {
   console.log("OPENROUTER_API_KEY가 없거나 SCRIPTED=1이라 실제 모델을 부르지 않아요. 기준선은 실제 모델로 만들어야 해요 (offline만 가능).");
   process.exit(1);
@@ -583,6 +589,85 @@ async function runAppraisal(runs: number) {
   json.appraisal = { seed, prefix: C.APPRAISAL_PREFIX, lines: C.APPRAISAL_LINES, cells };
 }
 
+// ------------------------------------------------------------------ 가치 실험 (docs/character-intent.md §6)
+
+async function runValue(runs: number) {
+  console.log(`· value: 윤재 첫 마디 · 발화 ${C.VALUE_LINES.length}개 × 조건 2 × ${runs}회 · 대사 모델 ${MODELS.npc_turn}`);
+  const seed = parseInt(createHash("sha256").update(stamp).digest("hex").slice(0, 8), 16);
+  const cells: import("./eval/value.js").ValueCell[] = [];
+  type Gen = import("./eval/value.js").ValueGen;
+  for (const [idx, item] of C.VALUE_LINES.entries()) {
+    if (budget.stopped) break;
+    const s = newGame(`eval-value-${idx}`, Date.now(), false, "m");
+    const cell: (typeof cells)[number] = { idx, line: item.line, about: item.about, gens: [] };
+    cells.push(cell);
+    if (!budget.allow(EST.turn_frame)) {
+      cell.factsFailure = `budget: ${budget.stopped}`;
+      continue;
+    }
+    // 1차는 발화마다 한 번: 두 조건이 같은 기록·점수를 쓴다 (1차는 Core를 보지 않는다)
+    const fr = await callWithRetry(modelConfig("turn_frame"), { ...buildFactsPrompt(s, item.line), schemaName: "turn_facts", schema: FACTS_JSON_SCHEMA }, (j, a) => parseFacts(s, item.line, j, !a.last));
+    account("turn_frame", fr.attempts);
+    if (!fr.ok) {
+      cell.factsFailure = fr.failure.message;
+      continue;
+    }
+    const facts = fr.value;
+    const who = (b: string) => (b === "player" ? "플레이어" : "윤재");
+    cell.facts = {
+      suggested: facts.evaluation.suggested_drop,
+      labels: facts.evaluation.labels,
+      reason: facts.evaluation.reason,
+      noticed: facts.evaluation.noticed,
+      summary: [
+        `정리: ${facts.resolved.map((r) => `${r.id} ${who(r.by)} ${r.status} “${r.quote}”`).join(", ") || "없음"}`,
+        `새 항목: ${facts.added.map((a) => `${a.id} ${who(a.by)} ${a.kind} “${a.quote}”`).join(", ") || "없음"}`,
+        `발화 행위: ${facts.acts.map((a) => `${a.act}${a.refersTo ? `→${a.refersTo}` : ""}`).join(", ")}`,
+      ].join(" · "),
+    };
+    const jobs = (["base", "value"] as const).flatMap((cond) => Array.from({ length: runs }, (_, i) => ({ cond, run: i + 1 })));
+    cell.gens = await pool(jobs, 4, async (job): Promise<Gen> => {
+      const fail = (failure: string, drafts: Gen["drafts"] = []): Gen => ({ cond: job.cond, run: job.run, ok: false, failure, drafts });
+      if (!budget.allow(APPRAISAL_GEN.max)) return fail(`budget: ${budget.stopped}`);
+      const r = await replyFromFacts(s, item.line, facts, [], job.cond === "value" ? { coreAddition: C.VALUE_ADDITION } : {});
+      account("npc_turn", r.attempts);
+      account("scene_check", r.sceneAttempts);
+      if (!r.ok) return fail(r.failure.message, AP.draftsFrom(r.attempts, []));
+      return { cond: job.cond, run: job.run, ok: true, drafts: AP.draftsFrom(r.attempts, r.reply.checks), final: r.reply.beats, move: r.reply.move, thought: r.reply.reason, outcome: r.reply.outcome, respondedModel: r.reply.model };
+    });
+    cell.gens.sort((a, b) => (a.cond === b.cond ? a.run - b.run : a.cond < b.cond ? -1 : 1));
+    console.log(`  ${idx + 1}. ${cell.gens.filter((g) => g.ok).length}/${jobs.length}`);
+  }
+
+  const kakao = SCENARIO.kakao.map((k) => `- ${k.time} ${k.from === "me" ? "나" : "윤재"}: ${k.text}${"readAt" in k && k.readAt ? ` (윤재가 ${k.readAt}에 읽음)` : ""}`);
+  const opening = scenarioFor("m").opening.flatMap((b) => [b.type === "narration" ? `*${b.content}*` : `> **윤재:** ${b.content}`, ""]);
+  const blind = VL.blindSheet(cells, seed, { kakao, opening, model: MODELS.npc_turn, runs });
+  writeFileSync(`${outDir}/transcripts/value-blind.md`, blind.md);
+  writeFileSync(`${outDir}/value-key.json`, JSON.stringify({ seed, key: blind.key }, null, 2));
+  // 대사에 영향을 준 제약 (두 조건 공통, 이번 실험에서 바꾸지 않았다): 기록만 한다
+  const constraints = [
+    "첫 마디 끝맺음: 서버가 정하지 않고 모델이 반론(counter)·질문(ask) 중 고른다. 수긍(concede)·여운(linger)으로 끝낼 수 없고, 해결책은 플레이어가 꺼내게 둔다 (`buildNpcPrompt`의 \"첫 응답의 끝맺음\"). 고른 쪽의 MOVE_GUIDE 조건을 모두 지켜야 한다",
+    `반론 조건 (MOVE_GUIDE.counter): ${MOVE_GUIDE.counter.slice(0, 160)}…`,
+    `질문 조건 (MOVE_GUIDE.ask): ${MOVE_GUIDE.ask}`,
+    `점수 구간 묘사 (시작 점수 100 → firm): ${BAND_GUIDE.firm}`,
+    "시작 마음: 피곤 3, 미안함 1, 방어심 3, 챙기고 싶은 마음 2, 마음 열림 1 (0~3)",
+    "1차의 의미 라벨이 \"방금 플레이어의 말에서 확인된 것\"으로 대사 프롬프트에 들어간다 (1차는 Core를 보지 않는다)",
+    "검증기 V1 반복 · V2 재주장 · V3 장면 · V4 끝맺음. 어기면 다시 생성한다 (최대 2회). 거부된 시도는 아래에 조건별로 적었다",
+  ];
+  writeFileSync(`${outDir}/transcripts/value-review.md`, VL.reviewSheet(cells, C.VALUE_ADDITION, constraints));
+  md.push(
+    "## 가치 실험: Core에 가치 하나 더하기",
+    "",
+    "- **같게 둔 것:** 장면 · 첫 마디 · 시작 마음 · 1차 결과(발화마다 1회, 두 조건 공통, 점수 포함) · 끝맺음 규칙 · 검증기 · 대사 모델",
+    "- **다르게 둔 것:** Core의 \"중요하게 생각하는 것\" 절 끝에 가치 단락 하나 (`VALUE_ADDITION`)",
+    "- 서비스 코드·점수·`chooseMove`는 바꾸지 않았다. 대사에 영향을 준 제약은 검토표에 기록만 했다",
+    `- 사람 검토: \`transcripts/value-blind.md\`(가린 비교, 먼저) → \`value-key.json\` → \`transcripts/value-review.md\` · 섞기 시드 ${seed}`,
+    `- 생성 성공 ${cells.flatMap((c) => c.gens).filter((g) => g.ok).length}/${cells.flatMap((c) => c.gens).length} (조건별 결과는 가린 비교 뒤에 검토표에서 본다)`,
+    "",
+  );
+  json.value = { seed, addition: C.VALUE_ADDITION, lines: C.VALUE_LINES, cells };
+}
+
 // ------------------------------------------------------------------ V3 장면 판정
 
 async function runScene(runs: number) {
@@ -798,6 +883,7 @@ const R = {
   sceneRuns: mode === "all" ? 3 : (runsOpt ?? 5),
   rejudgeRuns: runsOpt ?? 3,
   appraisalRuns: runsOpt ?? 3,
+  valueRuns: runsOpt ?? 2,
 };
 if (mode === "replay") {
   const play = opt("play");
@@ -833,6 +919,10 @@ if (mode === "scene" || mode === "all") B.addToPlan(plan, "장면 판정", C.SCE
 if (rejudgeData) B.addToPlan(plan, "재판정", rejudgeData.toJudge.length * R.rejudgeRuns, one("scene_check"));
 // 실험 1 대사 한 번: 대사 평균 1.15회(최대 2) + 판정 평균 0.45회(최대 2). 1차는 발화·연인마다 한 번
 const APPRAISAL_GEN = { expected: 1.15 * EST.npc_turn + 0.45 * EST.scene_check, max: 2 * EST.npc_turn + 2 * EST.scene_check, expectedCalls: 1.6, maxCalls: 4 };
+if (mode === "value") {
+  B.addToPlan(plan, "가치 실험 1차 (두 조건 공통)", C.VALUE_LINES.length, one("turn_frame"));
+  B.addToPlan(plan, "가치 실험 대사 (윤재 × 조건 2, 배포 모델)", C.VALUE_LINES.length * 2 * R.valueRuns, APPRAISAL_GEN);
+}
 if (mode === "appraisal") {
   B.addToPlan(plan, "실험 1 1차 (A·B 공통)", C.APPRAISAL_LINES.length * 2, one("turn_frame"));
   B.addToPlan(plan, "실험 1 대사 (A·B × 윤재·서아)", C.APPRAISAL_LINES.length * 2 * 2 * R.appraisalRuns, APPRAISAL_GEN);
@@ -866,6 +956,7 @@ try {
   if (R.mind.length) json.mind = await runReplay(R.mind, R.mindRuns, mode === "all" ? "같은 대화, 다른 시작 마음 soft (H5 기준선) — default는 위 리플레이와 비교" : "같은 대화, 다른 시작 마음 (H5 기준선)");
   if (rejudgeData) await runRejudge(rejudgeDirs, R.rejudgeRuns, rejudgeData);
   if (mode === "appraisal") await runAppraisal(R.appraisalRuns);
+  if (mode === "value") await runValue(R.valueRuns);
   if (mode === "v3compare") {
     const [a, b] = argv.slice(1, 3);
     if (!a || !b) throw new Error("사용법: npm run eval -- v3compare <결과폴더A> <결과폴더B>");
