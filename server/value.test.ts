@@ -4,7 +4,8 @@ import { coreFor, withCoreAddition } from "./content.js";
 import { buildNpcPrompt } from "./npc.js";
 import { newGame } from "./rules.js";
 
-const ADD = "윤재는 서로의 상황과 감정을 존중하는 관계를 중요하게 여긴다.";
+// 실험용 단락은 Core에 이미 들어간 가치 단락(consolidate@2)과 겹치지 않는 문장으로 시험한다
+const ADD = "테스트용 단락: 이 문장은 Core에 없다.";
 const state = newGame("value", 0, false, "m");
 
 describe("Core 변형", () => {
@@ -25,5 +26,14 @@ describe("Core 변형", () => {
   it("서아 Core에도 같은 자리에 들어간다", () => {
     const core = withCoreAddition(coreFor("f"), ADD);
     expect(core.indexOf(ADD)).toBeLessThan(core.indexOf("## 지금 서아의 상태"));
+  });
+
+  it("consolidate@2: 윤재 Core에는 가치 단락이 들어 있고 서아 Core에는 없다", () => {
+    const value = "윤재는 서로의 상황과 감정을 존중하는 관계를 중요하게 여긴다.";
+    const yunjae = coreFor("m");
+    expect(yunjae).toContain(value);
+    expect(yunjae.indexOf(value)).toBeGreaterThan(yunjae.indexOf("## 중요하게 생각하는 것"));
+    expect(yunjae.indexOf(value)).toBeLessThan(yunjae.indexOf("## 지금 상태"));
+    expect(coreFor("f")).not.toContain("서로의 상황과 감정을 존중하는 관계");
   });
 });

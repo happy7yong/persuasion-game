@@ -284,7 +284,8 @@ function beatLine(b: { type: string; content: string }) {
 // ledger@2 (2026-11-23): 1차의 정리 기준을 "말로 분명히 드러낸 경우만"으로 좁혔다 (docs/appraisal-review.md §12). 대사 프롬프트는 같다
 // consolidate@1 (2026-11-24, prompt-consolidation 브랜치): 공통 원칙 4·5·6을 두 원칙("말로 다 하지 않는다", "뜻이 통하게")으로 통합, 표현의 구체성 1번째 줄 삭제,
 // MOVE_GUIDE.counter의 형식 강제 삭제, 윤재 Core의 사과·갈등 발화 순서 지시 삭제 (docs/eval/consolidation-2026-11-24.md)
-export const NPC_PROMPT_VERSION = "consolidate@1";
+// consolidate@2 (2026-11-24): 윤재 Core "중요하게 생각하는 것" 절 끝에 가치 단락(서로의 상황과 감정을 존중하는 관계)을 넣었다. 가치 실험(docs/character-intent.md §6)과 같은 문장·같은 위치. 서아는 그대로
+export const NPC_PROMPT_VERSION = "consolidate@2";
 
 /** strict json_schema (B의 llm01WireSchema와 같은 방식). 모든 필드 필수, 추가 필드 금지. */
 export const NPC_JSON_SCHEMA = {
