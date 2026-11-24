@@ -311,6 +311,12 @@ button:disabled {
   font-size: 14px;
   margin-top: 2px;
 }
+.intro-count-question {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-weight: 700;
+}
 .intro-count-sub b {
   color: var(--ink);
   font-weight: 700;
