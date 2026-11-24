@@ -19,7 +19,7 @@ export function ReportView({ report, stats, token, onRetry, preview = false }: {
     track("share_clicked");
     // 링크를 열면 첫 화면에 내 결과 카드가 보인다 (src/share.ts)
     const url = shareUrl(report);
-    const text = `나는 ${npcName}의 마음을 ${shake}% 움직였다. 너는?`;
+    const text = `나는 ${npcName}와 ${shake}% 통했다. 너는?`;
     try {
       if (navigator.share) await navigator.share({ text, url });
       else {

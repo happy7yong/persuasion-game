@@ -1,13 +1,13 @@
-// 결과 맨 위 카드: 결과 이름, 움직인 %, 설득 성공선 게이지, 한 줄 설명.
+// 결과 맨 위 카드: 결과 이름, 마음이 통한 %, 설득 성공선 게이지, 한 줄 설명.
 // 내 결과 화면(Report)과, 공유 링크로 들어온 첫 화면(친구의 결과)에서 같이 쓴다.
 import { useEffect, useState, type ReactNode } from "react";
 import type { Outcome } from "./api";
 
 // 연인 이름은 모두 받침이 없어 조사가 같다 (server/content.ts PARTNERS)
 export const OUTCOME: Record<Outcome, { name: string; note: (npc: string) => string }> = {
-  success: { name: "설득 성공", note: (n) => `${n}의 마음을 돌렸어요.` },
-  compromise: { name: "타협", note: () => "완전히 넘어오진 않았지만, 꽤 가까워졌어요." },
-  breakdown: { name: "결렬", note: (n) => `${n}는 아직 생각이 그대로예요.` },
+  success: { name: "설득 성공", note: (n) => `내 서운함도 전해졌고, ${n}도 마음을 열었어요.` },
+  compromise: { name: "타협", note: () => "분위기는 풀렸지만, 내 마음은 다 전하지 못했어요." },
+  breakdown: { name: "결렬", note: () => "서로 마음이 엇갈렸어요." },
   giveup: { name: "포기", note: () => "대화를 중간에 멈췄어요." },
 };
 
@@ -57,11 +57,11 @@ export function ResultSummary({
       <p className={`report-outcome ${outcome}`}>{OUTCOME[outcome].name}</p>
       <Title className="report-title">
         {friend ? "친구는 " : ""}
-        {npcName}의 마음을
+        {npcName}와
         <span className="report-number">{shown}%</span>
-        움직였어요
+        통했어요
       </Title>
-      <div className="meter" role="meter" aria-label={`${npcName}의 마음을 움직인 정도`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={shake}>
+      <div className="meter" role="meter" aria-label={`${npcName}와 마음이 통한 정도`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={shake}>
         <div className="meter-fill" style={{ width: `${shown}%` }} />
         <div className="meter-goal" style={{ left: `${successShake}%` }}>
           <span>설득 성공 {successShake}%</span>
@@ -69,11 +69,11 @@ export function ResultSummary({
       </div>
       <p className="report-note">
         {friend ? (
-          <>당신은 {npcName}의 마음을 몇 % 움직일 수 있을까요?</>
+          <>당신은 {npcName}와 몇 % 통할 수 있을까요?</>
         ) : (
           <>
             {OUTCOME[outcome].note(npcName)}
-            {outcome !== "success" && shake < successShake && ` 설득까지 ${successShake - shake}% 남았어요.`}
+            {outcome !== "success" && shake < successShake && ` 성공까지 ${successShake - shake}% 남았어요.`}
           </>
         )}
       </p>

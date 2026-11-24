@@ -15,7 +15,7 @@ import { ReportView } from "./Report";
 import { GiveupDialog } from "./GiveupDialog";
 import { ResultSummary } from "./ResultSummary";
 import { clearSharedParams, DEV_SHARED, readSharedResult, type SharedResult } from "./share";
-import { sampleDistribution } from "./rank";
+import { MIN_FOR_COUNT, sampleDistribution } from "./rank";
 import { tag, tagPlay, track } from "./clarity";
 import {
   clearGame,
@@ -316,9 +316,9 @@ function Intro({
           )}
         </h1>
         <p className="intro-lede">
-          오늘 하루 종일 연락이 없던 연인{chosen ? ` ${chosen.name}` : ""}.
+          오늘 팀장님한테 깨져서 기댈 곳이 필요했는데, {chosen ? `연인 ${chosen.name}는` : "연인은"} 하루 종일 답이 없었어요.
           <br />
-          다섯 마디 안에 마음을 돌릴 수 있을까요?
+          서운한 마음, 싸우지 않고 전할 수 있을까요?
         </p>
         <fieldset className="partner">
           <legend>누구와 이야기할까요?</legend>
@@ -344,10 +344,13 @@ function Intro({
         <div className="intro-count" aria-live="polite">
           {stats && stats.best !== null ? (
             <>
-              연인의 마음을 가장 많이 흔든 기록은 <strong>{stats.best}%</strong>
-              <span className="intro-count-sub">
-                벌써 <b>{stats.finished}명</b>이 도전했어요. 과연 연인의 마음을 얼마나 움직일 수 있을까요?
-              </span>
+              연인과 가장 잘 통한 기록은 <strong>{stats.best}%</strong>
+              {/* 참여자가 MIN_FOR_COUNT명 모이기 전에는 몇 명이 도전했는지 밝히지 않는다 */}
+              {stats.finished >= MIN_FOR_COUNT && (
+                <span className="intro-count-sub">
+                  벌써 <b>{stats.finished}명</b>이 도전했어요.
+                </span>
+              )}
             </>
           ) : (
             <>아직 기록이 없어요. 첫 기록을 세워 보세요.</>
@@ -355,13 +358,13 @@ function Intro({
         </div>
         <section className="intro-rules" aria-label="대화 규칙">
           <p className="intro-rules-heading">
-            {chosen?.name ?? "상대"}의 마음을 바꿀 기회는 단 <strong>5번!</strong>
+            {chosen?.name ?? "상대"}에게 내 마음을 전할 기회는 단 <strong>5번!</strong>
           </p>
           <p className="intro-rules-lede">
-            주어진 <strong>600자</strong> 안에서 {chosen?.name ?? "상대"}를 설득해 보세요.
+            {chosen?.name ?? "상대"}의 사정도 들어 주면서, 오늘 서운했던 내 마음을 <strong>600자</strong> 안에 전해 보세요.
           </p>
           <p className="intro-rules-note">
-            보낸 메시지는 수정할 수 없고, {chosen?.name ?? "상대"}의 마음이 얼마나 움직였는지는 대화가 끝난 뒤 확인할 수 있어요.
+            보낸 메시지는 수정할 수 없고, {chosen?.name ?? "상대"}와 얼마나 마음이 통했는지는 대화가 끝난 뒤 확인할 수 있어요.
           </p>
         </section>
         <label className="check">

@@ -3,6 +3,9 @@
 /** 이만큼 모이기 전에는 "상위 N%"를 보여 주지 않는다 (몇 명으로 순위를 매기면 오해를 산다) */
 export const MIN_FOR_RANK = 10;
 
+/** 이만큼 모이기 전에는 참여자 수(몇 명이 도전했는지, 구간별 몇 명인지)를 화면에 밝히지 않는다 */
+export const MIN_FOR_COUNT = 100;
+
 export interface Bin {
   from: number;
   to: number;
