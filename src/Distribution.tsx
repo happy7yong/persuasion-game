@@ -20,7 +20,7 @@ export function Distribution({ counts, shake, successShake }: { counts: number[]
   const showCounts = rank.total >= MIN_FOR_COUNT;
 
   return (
-    <section className="dist" aria-labelledby="dist-title">
+    <section className="dist report-reveal report-reveal-dist" aria-labelledby="dist-title">
       <h2 id="dist-title" className="dist-title">
         다른 사람들은 몇 % 통했을까?
       </h2>
