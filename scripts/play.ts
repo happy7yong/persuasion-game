@@ -136,8 +136,10 @@ if (state.turns.length > 0) {
   else {
     console.log(`\n${c.b("대화 피드백")}`);
     console.log(`  ${b.belief.summary}`);
-    for (const pt of b.belief.points) console.log(`  - ${c.b(`좋았던 점 · ${pt.strength}`)}  ${c.dim(`근거 ${pt.turn}번째 말 "${pt.quote}"`)}\n    보완할 점 · ${pt.improve}\n    다음에는 · ${pt.suggestion}`);
-    console.log(`  ${b.belief.closing}`);
+    console.log(`  ${c.b("상대에게 닿은 부분")} · ${b.belief.received}`);
+    console.log(`  ${c.b("아직 남은 이야기")} · ${b.belief.gap}`);
+    for (const e of b.belief.evidence) console.log(`  - ${e.turn}번째 말 · 내 말 "${e.playerQuote}"${e.thoughtQuote ? ` / 속마음 "${e.thoughtQuote}"` : ""}`);
+    console.log(`  ${c.b("다음 대화의 방향")} · ${b.belief.direction}`);
   }
 
   console.log(c.dim(`\n● LIVE  사실 이 대화는 은하연애위원회에 생중계되고 있었습니다. 1,000년 뒤 신문을 인쇄하는 중…`));

@@ -51,7 +51,7 @@ export interface TurnRecord {
   move?: NpcMove;
   /** 이 말을 들은 연인의 속마음 (리포트에서 공개) */
   thought?: string;
-  /** 이 말에서 연인이 플레이어에 대해 알게 된 것 ("내가 본 너"의 근거) */
+  /** 이 말에서 연인이 플레이어에 대해 알게 된 것 (대화 돌아보기의 참고 정보) */
   noticed?: string;
   /** 1차 발화 분석을 검증해 확정한 이번 마디의 사실 (장부 도입 전 기록에는 없음) */
   facts?: TurnFacts;

@@ -5,10 +5,14 @@ import { track } from "./clarity";
 type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ready"; belief: Belief };
 
 const PREVIEW_FEEDBACK: Belief = {
-  kind: "feedback", npcName: "윤재", summary: "상대의 한계를 받아들인 뒤 원하는 행동을 좁혀 말한 흐름이 가장 설득력 있었어요.", closing: "상대의 입장을 먼저 받아준 뒤, 내가 바라는 한 가지를 구체적으로 말해 보세요.",
-  points: [
-    { strength: "윤재의 업무 한계를 먼저 인정했어요", turn: 2, quote: "바로 못 보는 날이 있다는 건 이해해", improve: "그 한계가 내게 어떤 불안을 만들었는지도 함께 연결하면 좋아요.", suggestion: "바쁜 건 이해해. 다만 이유를 몰라서 내가 불안했던 건 알아줬으면 해." },
-    { strength: "실제로 가능한 방법을 하나로 좁혔어요", turn: 3, quote: "이유를 먼저 말해줘", improve: "나도 바꿀 행동을 함께 말하면 일방적인 요구로 들리지 않아요.", suggestion: "너는 이유를 먼저 말해주고, 나는 걱정됐다고 말하는 걸로 해보자." },
+  kind: "feedback", v: 3, npcName: "윤재",
+  summary: "플레이어가 바쁜 날을 이해한다고 말한 뒤 구체적인 부탁으로 이어가면서 윤재의 마음이 풀렸어요. 기다리는 동안 플레이어의 마음은 짧게 지나갔어요.",
+  received: "윤재는 바쁜 날을 이해해 준 말과 나중에 이유를 알려 달라는 부탁을 받아들였어요.",
+  gap: "대화는 방법을 정하는 쪽으로 이어졌지만, 답을 기다리며 느낀 감정은 처음의 ‘걱정했어’ 이후 더 이야기하지 않았어요.",
+  direction: "답이 어려웠던 사정과 기다리는 동안의 감정을 함께 놓고 살펴보면 좋겠습니다.",
+  evidence: [
+    { turn: 2, playerQuote: "바로 못 보는 날이 있다는 건 이해해", thoughtQuote: "내 사정을 먼저 봐준 건 고맙다" },
+    { turn: 3, playerQuote: "오래 비는 날엔 나중에 이유를 먼저 말해줘", thoughtQuote: "그 방법이면 나도 해볼 수 있겠다" },
   ],
 };
 
@@ -48,7 +52,7 @@ export function BeliefCard({ token, npcName, preview = false }: { token: string;
       <h2 id="belief-title" className="belief-title">
         대화 돌아보기
       </h2>
-      <p className="belief-desc">{npcName}가 반응한 말과, 아직 풀리지 않은 얘기를 모아뒀어요.</p>
+      <p className="belief-desc">내 말 전체와 {npcName}의 속마음을 함께 돌아봤어요.</p>
 
       {state.kind === "loading" && (
         <div className="belief-loading" role="status">
@@ -69,20 +73,30 @@ export function BeliefCard({ token, npcName, preview = false }: { token: string;
       {state.kind === "ready" && (
         <>
           <blockquote className="belief-summary">{state.belief.summary}</blockquote>
-          <ol className="belief-points">
-            {state.belief.points.map((p, i) => (
-              <li key={i}>
-                <p className="belief-suggestion"><span>다음에 말해보기</span>{p.suggestion}</p>
-                <p className="belief-claim">좋았던 점: {p.strength}</p>
-                <button className="evidence" onClick={() => goToTurn(p.turn)} aria-label={`근거: ${p.turn}번째 말로 이동`}>
-                  <span className="evidence-label">근거: {p.turn}번째 말</span>
-                  <span className="evidence-quote">“{p.quote}”</span>
-                </button>
-                <p className="belief-why">보완할 점: {p.improve}</p>
-              </li>
+          <div className="belief-flow">
+            <div>
+              <h3>{npcName}에게 닿은 부분</h3>
+              <p>{state.belief.received}</p>
+            </div>
+            <div>
+              <h3>아직 남은 이야기</h3>
+              <p>{state.belief.gap}</p>
+            </div>
+          </div>
+          <div className="belief-evidence">
+            <h3>대화 속 답변</h3>
+            {state.belief.evidence.map((e) => (
+              <button key={e.turn} className="evidence" onClick={() => goToTurn(e.turn)} aria-label={`${e.turn}번째 말로 이동`}>
+                <span className="evidence-label">{e.turn}번째 말</span>
+                <span className="evidence-quote">내 말 “{e.playerQuote}”</span>
+                {e.thoughtQuote && <span className="evidence-thought">{npcName}의 속마음 “{e.thoughtQuote}”</span>}
+              </button>
             ))}
-          </ol>
-          <p className="belief-expect">{state.belief.closing}</p>
+          </div>
+          <div className="belief-direction">
+            <h3>다음 대화의 방향</h3>
+            <p>{state.belief.direction}</p>
+          </div>
         </>
       )}
     </section>

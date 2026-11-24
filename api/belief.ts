@@ -1,8 +1,8 @@
-// "내가 본 너": 끝난 판에서 연인이 플레이어를 어떻게 봤는지. 리포트를 보여 준 뒤 따로 부른다.
+// 대화 돌아보기: 끝난 판의 말과 연인 속마음을 대조한다. 리포트를 먼저 보여 준 뒤 따로 부른다.
 // 한 번 만든 판단은 저장해 두고 다시 돌려준다 (같은 판에서 판단이 바뀌지 않게, 비용도 한 번만).
 import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
-import { BELIEF_PROMPT_VERSION, writeBelief } from "../server/belief.js";
+import { BELIEF_PROMPT_VERSION, isCurrentBelief, writeBelief } from "../server/belief.js";
 import { fail, guarded, parseRequest, send } from "../server/http.js";
 import { listTurns, saveAttempts, saveBelief, storedBelief } from "../server/store.js";
 import { catchUp } from "../server/sync.js";
@@ -20,8 +20,8 @@ export default guarded(async (req, res) => {
     const rows = await listTurns(state.id);
     if (rows) state = catchUp(state, rows).latest;
     const cached = await storedBelief(state.id);
-    // 예전 "내가 본 너" 캐시는 새 피드백 형식과 달라서 다시 만든다.
-    if (cached && typeof cached === "object" && (cached as { kind?: unknown }).kind === "feedback") return send(res, 200, { belief: cached });
+    // 예전 마디별 피드백(v2)은 전체 대화 피드백(v3)과 달라서 다시 만든다.
+    if (isCurrentBelief(cached)) return send(res, 200, { belief: cached });
   } catch {
     return fail(res, "service_unavailable", "기록 저장소에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   }
